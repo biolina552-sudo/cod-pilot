@@ -13,7 +13,8 @@ export async function exportMontage({clips,voice,canvas,onProgress,isCancelled})
   const kind=await pickFormat(canvas);
   const target=new BufferTarget(),output=new Output({format:kind.format,target});
   const video=new CanvasSource(canvas,{codec:kind.video,bitrate:kind.bitrate});
-  const audio=new AudioBufferSource({codec:kind.audio,bitrate:128000});
+  // Match the AAC layout probed in pickFormat so mono or 24 kHz narration still encodes.
+  const audio=new AudioBufferSource({codec:kind.audio,bitrate:128000,transform:kind.audio==='aac'?{numberOfChannels:2,sampleRate:48000}:undefined});
   output.addVideoTrack(video);output.addAudioTrack(audio);
   const ctx=new AudioContext(),inputs=new Map();let finalized=false;
   try{

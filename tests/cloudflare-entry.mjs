@@ -4,12 +4,12 @@ import {webcrypto as crypto} from 'node:crypto';
 // Run after `npm run build`: the wrapper imports dist/server/index.js.
 const team='team.cloudflareaccess.com',aud='test-aud';
 const pair=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
-const jwk={...await crypto.subtle.exportKey('jwk',pair.publicKey),kid:'k1'};
+let jwk={...await crypto.subtle.exportKey('jwk',pair.publicKey),kid:'k1'};
 const realFetch=globalThis.fetch;
 globalThis.fetch=async url=>{assert.equal(String(url),'https://'+team+'/cdn-cgi/access/certs');return new Response(JSON.stringify({keys:[jwk]}))};
 const b64=v=>Buffer.from(typeof v==='string'?v:JSON.stringify(v)).toString('base64url');
-async function token(claims,key=pair.privateKey){
-  const body=b64({alg:'RS256',kid:'k1'})+'.'+b64(claims);
+async function token(claims,key=pair.privateKey,kid='k1'){
+  const body=b64({alg:'RS256',kid})+'.'+b64(claims);
   const sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(body));
   return body+'.'+Buffer.from(sig).toString('base64url');
 }
@@ -29,6 +29,13 @@ for(const bad of [{...good,aud:['other']},{...good,iss:'https://evil'},{...good,
 const other=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign']);
 assert.equal((await status({'cf-access-jwt-assertion':await token(good,other.privateKey)})).code,401,'wrong signature');
 assert.equal((await status({'cf-access-jwt-assertion':'garbage'})).code,401);
+// Key rotation: an unknown kid triggers one refetch of the certs.
+const rotated=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
+jwk={...await crypto.subtle.exportKey('jwk',rotated.publicKey),kid:'k2'};
+const realNow=Date.now;Date.now=()=>realNow()+31000;
+r=await status({'cf-access-jwt-assertion':await token(good,rotated.privateKey,'k2')});
+Date.now=realNow;
+assert.equal(r.code,200,'rotated signing key is picked up');
 // DEV_USER_EMAIL works only on localhost and only without Access configured.
 const dev=async(url,e)=>(await entry.fetch(new Request(url+'/api/voice/status'),e,{})).status;
 assert.equal(await dev('http://localhost:8787',{DEV_USER_EMAIL:'me@x'}),200);

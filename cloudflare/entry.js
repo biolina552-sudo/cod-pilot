@@ -10,9 +10,9 @@ let certCache={url:'',at:0,keys:null};
 
 function b64url(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
 
-async function accessKeys(team){
+async function accessKeys(team,force=false){
   const url='https://'+team+'/cdn-cgi/access/certs';
-  if(certCache.url===url&&certCache.keys&&Date.now()-certCache.at<3600000)return certCache.keys;
+  if(!force&&certCache.url===url&&certCache.keys&&Date.now()-certCache.at<3600000)return certCache.keys;
   const r=await fetch(url);if(!r.ok)throw Error('ACCESS_CERTS_UNAVAILABLE');
   const {keys}=await r.json();
   certCache={url,at:Date.now(),keys:await Promise.all(keys.filter(k=>k.kty==='RSA').map(async k=>({kid:k.kid,key:await crypto.subtle.importKey('jwk',k,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['verify'])})))};
@@ -22,7 +22,10 @@ async function accessKeys(team){
 async function verifyAccess(token,env){
   const [h,p,sig]=String(token||'').split('.');if(!h||!p||!sig)return null;
   const header=JSON.parse(new TextDecoder().decode(b64url(h)));if(header.alg!=='RS256')return null;
-  const keys=await accessKeys(env.ACCESS_TEAM_DOMAIN),k=keys.find(k=>k.kid===header.kid);if(!k)return null;
+  // An unknown kid usually means Access rotated its keys: refetch once (at most every 30s).
+  let k=(await accessKeys(env.ACCESS_TEAM_DOMAIN)).find(k=>k.kid===header.kid);
+  if(!k&&Date.now()-certCache.at>30000)k=(await accessKeys(env.ACCESS_TEAM_DOMAIN,true)).find(k=>k.kid===header.kid);
+  if(!k)return null;
   if(!await crypto.subtle.verify('RSASSA-PKCS1-v1_5',k.key,b64url(sig),new TextEncoder().encode(h+'.'+p)))return null;
   const claims=JSON.parse(new TextDecoder().decode(b64url(p))),now=Date.now()/1000;
   const aud=Array.isArray(claims.aud)?claims.aud:[claims.aud];
