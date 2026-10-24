@@ -1,0 +1,26 @@
+COD Pilot Studio — نسخة الكود v60 — 2026-10-24
+المشروع: appgprj_6ad6aab9c37481918c30f40a6d41ced7
+الموقع: https://codpilot-studio.eretbiabd0.chatgpt.site/creative
+Source commit: 7b6c0704c9f2e9a6de26ec64f7234b22fc0a75b8
+
+فك ضغط ZIP، وافتح المجلد في محرر مثل VS Code.
+هذه نسخة المصدر للتعديل والنسخ الاحتياطي؛ ليست برنامج Windows جاهزاً للتثبيت.
+المفاتيح السرية والبيانات الخاصة المحفوظة في الخادم ليست ضمن الملف.
+لا تضع المفاتيح في المحادثات أو داخل كود الواجهة.
+الربط الحالي على الموقع الأصلي لا يتغير بتنزيل هذا الملف.
+
+للمطور:
+Requires Node.js, npm, Python 3 and Bash (on Windows use WSL or Git Bash).
+npm ci
+npm run build
+npm run validate
+Build outputs: dist/worker.js and dist/hosting.json.
+Hosting requires a compatible Worker environment and the configured R2 BUCKET binding.
+Opening creative.html directly is not equivalent to running the hosted app: server APIs, auth and secrets are required.
+See VOICE-SETUP.md and META-SETUP.md. Some older README integration notes may predate the current direct Gemini integration.
+
+الحالة:
+رفع صوت جاهز وفيديوهات، اختيار اللقطات ومونتاج WebM داخل المتصفح.
+التصدير يتطلب بقاء الصفحة مفتوحة؛ راجع المعاينة قبل الاستعمال.
+الإطلاق التلقائي للإعلانات غير جاهز. إصلاح اتصال n8n القديم ليس مؤكداً ضمن هذا التحديث.
+استعمل نفس مشروع Studio عند متابعة التعديل، ولا تنشئ نسخة Workspace بالخطأ.

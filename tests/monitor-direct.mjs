@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';
+let calls=[],connections={connections:[{id:'42',token:'private-token',expires_at:Date.now()+3600000}]};
+const context=vm.createContext({URL,Date,Response,Number,String,Map,Array,Error,json:(d,s=200)=>Response.json(d,{status:s}),metaConnections:async()=>connections,metaList:async()=>({items:[{id:'act_123',name:'Test account',currency:'MAD',timezone_name:'Africa/Casablanca'}]}),metaGraph:async(env,token,path,params)=>{calls.push({token,path,params});if(path.endsWith('/campaigns'))return {data:[{id:'1',name:'Has data',effective_status:'PAUSED'},{id:'2',name:'No data',status:'ACTIVE'}]};return {data:[{campaign_id:'1',spend:'100',impressions:'1000',inline_link_clicks:'10',actions:[{action_type:'offsite_conversion.fb_pixel_purchase',value:'2'},{action_type:'omni_purchase',value:'2'}],action_values:[{action_type:'offsite_conversion.fb_pixel_purchase',value:'500'}]}]}}});
+vm.runInContext(fs.readFileSync('monitor-direct-server.js','utf8')+';globalThis.testMonitor=personalMetaMonitor',context);
+const req=(body,origin='https://test.site')=>new Request('https://test.site/api/monitor',{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)});
+const run=(body,user='owner',origin)=>context.testMonitor(req(body,origin),{},user);
+assert.equal((await run({account:'123',connection_id:'42'},null)).status,401);
+assert.equal((await run({account:'123',connection_id:'42'},'owner','https://evil.test')).status,403);
+assert.equal((await run({account:'999',connection_id:'42'})).status,403);assert.equal(calls.length,0);
+assert.equal((await run({account:'123',connection_id:'99'})).status,403);
+let r=await run({account:'act_123',connection_id:'42'}),d=await r.json();assert.equal(r.status,200);assert.equal(d.read_only,true);assert.equal(d.connection_id,'42');assert.equal(d.campaigns.length,2);assert.equal(d.campaigns[0].reported_purchases,2);assert.equal(d.campaigns[0].cpa,50);assert.equal(d.campaigns[0].roas,5);assert.equal(d.campaigns[1].spend,null);assert.equal(d.campaigns[1].has_insights,false);assert(!JSON.stringify(d).includes('private-token'));assert(calls.every(c=>c.path.startsWith('act_123/')));assert.equal(calls.find(c=>c.path.endsWith('insights')).params.date_preset,'last_7d');
+connections.connections[0].expires_at=0;assert.equal((await run({account:'123',connection_id:'42'})).status,401);
+connections={connections:[]};assert.equal(await run({account:'123'}),null);assert.equal((await run({account:'123',connection_id:'42'})).status,403);
+console.log('PASS: monitor authentication, origin, profile/account guards, missing-vs-zero, non-duplicated purchases, CPA/ROAS, expiry, no token leaks');

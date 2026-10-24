@@ -1,0 +1,10 @@
+import vm from 'node:vm';import fs from 'node:fs';import assert from 'node:assert/strict';
+let calls=[];const cache=new Map();const wav=Buffer.alloc(44);wav.write('RIFF');wav.write('WAVE',8);
+const c=vm.createContext({Response,Request,URL,AbortSignal,Uint8Array,atob,json:(v,status=200)=>Response.json(v,{status}),fetch:async(url,opts)=>{calls.push(JSON.parse(opts.body));return Response.json({steps:[{type:'model_output',content:[{type:'audio',data:wav.toString('base64')}]}]})}});
+vm.runInContext(fs.readFileSync('google-voice-server.js','utf8')+fs.readFileSync('voice-server.js','utf8')+';this.run=handleVoice',c);
+const env={GEMINI_API_KEY:'test',VOICE_OWNER_ID:'owner',BUCKET:{get:async k=>cache.has(k)?{body:cache.get(k)}:null,put:async(k,v)=>cache.set(k,v)}};
+async function run(path,body,user='owner',origin='https://test.site'){const u=new URL('https://test.site/api/voice/'+path);return c.run(new Request(u,{method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)}),env,user,u)}
+for(const voice of ['Kore','Puck','Charon','Sulafat']){assert.equal((await run('sample',{provider:'google',voice})).status,200);assert.equal(calls.at(-1).generation_config.speech_config[0].voice,voice)}
+assert.equal(calls.length,4);assert.equal((await run('sample',{provider:'google',voice:'Puck'})).status,200);assert.equal(calls.length,4,'sample replay must use cache');
+assert.equal((await run('sample',{provider:'google',voice:'custom-untrusted'})).status,400);assert.equal((await run('sample',{provider:'google',voice:'Kore'},'visitor')).status,403);assert.equal((await run('sample',{provider:'google',voice:'Kore'},'owner','https://other.site')).status,403);assert.equal(calls.length,4);
+assert.equal((await run('generate',{provider:'google',voice:'Sulafat',text:'مرحبا'})).status,200);assert.equal(calls.at(-1).generation_config.speech_config[0].voice,'Sulafat');assert.equal(calls.at(-1).input[0].content[0].text,'مرحبا');console.log('PASS 4 voices, selected voice used for generation, sample cache, owner/origin/voice guards');

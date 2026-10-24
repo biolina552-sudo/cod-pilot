@@ -1,0 +1,1 @@
+COD Pilot. Private campaign preparation workspace, Arabic/French/English. Worker proxy calls existing n8n ad assistant. Configure N8N_WEBHOOK_KEY as a Sites secret; Gemini and Meta credentials remain in n8n. Monitor integration optional via N8N_MONITOR_URL. Drafts/products are browser-local; no automatic campaign launch.
