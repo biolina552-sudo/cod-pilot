@@ -46,6 +46,11 @@ jobs:
         run: |
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || unset CLOUDFLARE_ACCOUNT_ID
           npx wrangler deploy
+      - name: Deploy landing pages worker
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || unset CLOUDFLARE_ACCOUNT_ID
+          npx wrangler deploy --config shop/wrangler.toml
       - name: Copy app secrets from GitHub to Cloudflare
         if: env.CLOUDFLARE_API_TOKEN != ''
         # Only secrets that are set in GitHub are copied; others are left as they are in Cloudflare.

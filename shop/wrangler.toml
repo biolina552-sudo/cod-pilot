@@ -1,0 +1,9 @@
+# Public worker for landing pages (no sign-in). See CLOUDFLARE-SETUP.md.
+name = "cod-pilot-shop"
+main = "entry.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "cod-pilot-media"
