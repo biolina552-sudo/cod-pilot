@@ -180,12 +180,19 @@ $('wGo').onclick=async()=>{
       const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:prompts[i]})).id}catch(x){imgErrs.add(errOf(x));say('تصويرة '+(i+1)+': '+errOf(x),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
       await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);caps[id]={t:copy.image_captions?.[i]||'',s:copy.image_subcaptions?.[i]||''}}});
     }
+    const aiPhotos=scenes.length;
+    if(!aiPhotos){
+      // No AI photos (none asked, or Gemini failed): build designed posters from code instead.
+      say('⏳ كنصاوب بوسترات مصممة من التصاور ديالك...');
+      const nc=(niches.find(n=>n.id===niche)||{}).color||copy.color||'#196c58';
+      scenes.push(...await codePosters(copy,wImages,/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58',lang==='ar',niche));
+    }
     steps(list,list.length-1);
     const old=parseFloat($('wOld').value);
     openEditor({...copy,niche,color:(niches.find(n=>n.id===niche)||{}).color||copy.color,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
     steps(list,list.length);
     // Keep image errors visible: otherwise the success message hides why photos are missing.
-    if(count&&!scenes.length)say('⚠️ النص واجد، ولكن التصاور الاحترافية ماتولداتش: '+[...imgErrs].join(' / '),true);
+    if(count&&!aiPhotos)say('⚠️ تصاور Gemini ماتولداتش ('+[...imgErrs].join(' / ')+'). عوضتهم بـ '+scenes.length+' بوسترات مصممة من التصاور ديالك. راجع الصفحة ومن بعد كليكي "حفظ ونشر".',true);
     else say('✔ الصفحة واجدة'+(imgErrs.size?' (شي تصاور ماتولداتش: '+[...imgErrs].join(' / ')+')':'')+'. راجع النص والتصاور، ومن بعد كليكي "حفظ ونشر".');
   }catch(x){say(errOf(x),true)}
   $('wGo').disabled=false;
@@ -228,7 +235,7 @@ $('genScene').onclick=async()=>{
 // Posters as PNG files, same style as the page: big dark title, colored ribbon, rounded photo.
 const NICHE_RIBBON={general:['#f2a33a','#fff'],kitchen:['#f39c12','#fff'],health:['#22b8a6','#fff'],beauty:['#f06292','#fff'],home:['#f5b700','#1f1f1f'],kids:['#ff8a3d','#fff'],sport:['#212121','#fff'],tech:['#00a8e8','#fff'],car:['#ff6f00','#fff'],fashion:['#c9a227','#1f1f1f'],pets:['#43a047','#fff']};
 function darker(hex,k=.72){const n=parseInt(hex.slice(1),16);return 'rgb('+[n>>16,n>>8&255,n&255].map(v=>Math.round(v*k)).join(',')+')'}
-async function posterPng(id,cap,color,rtl,niche){
+async function posterPng(id,cap,color,rtl,niche,type='image/png'){
   await Promise.all([document.fonts.load('900 76px Cairo'),document.fonts.load('800 44px Cairo')]);
   const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
   const W=1080,P=40,x=document.createElement('canvas').getContext('2d');
@@ -243,7 +250,40 @@ async function posterPng(id,cap,color,rtl,niche){
   if(sl.length){g.font=S;const y0=60+tl.length*100+20,bw=Math.max(...sl.map(l=>g.measureText(l).width))+80,bh=sl.length*62+16;
     g.save();g.translate(W/2,y0+bh/2);g.rotate(-.025);g.fillStyle=rb;g.beginPath();g.roundRect(-bw/2,-bh/2,bw,bh,bh/2);g.fill();g.fillStyle=rt;sl.forEach((l,i)=>g.fillText(l,0,-bh/2+8+31+i*62));g.restore()}
   g.save();g.beginPath();g.roundRect(P,top,iw,ih,36);g.clip();g.drawImage(im,P,top,iw,ih);g.restore();
-  return await new Promise(r=>c.toBlob(r,'image/png'));
+  return await new Promise(r=>c.toBlob(r,type,.9));
+}
+// A list poster drawn from code: dark title, small product photo, then rows of icon + text.
+async function listPng(id,title,rows,color,rtl){
+  await Promise.all([document.fonts.load('900 70px Cairo'),document.fonts.load('700 42px Cairo')]);
+  const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
+  const W=1080,P=60,x=document.createElement('canvas').getContext('2d');
+  const wrap=(text,font,max)=>{x.font=font;const out=[];let line='';for(const w of String(text||'').split(/\s+/).filter(Boolean)){const t=line?line+' '+w:w;if(x.measureText(t).width>max&&line){out.push(line);line=w}else line=t}if(line)out.push(line);return out};
+  const T="900 70px Cairo",R="700 42px Cairo",tl=wrap(title,T,W-2*P),items=rows.map(([icon,text])=>[icon,wrap(text,R,W-2*P-150)]);
+  const ph=480,top=70+tl.length*92+30,rowsH=items.reduce((h,[,l])=>h+Math.max(110,l.length*58+40),0),c=x.canvas;c.width=W;c.height=top+ph+50+rowsH+50;
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,c.height);
+  g.globalAlpha=.1;g.fillStyle=color;g.beginPath();g.ellipse(W/2,c.height+80,W*.8,280,0,0,7);g.fill();g.globalAlpha=1;
+  g.textAlign='center';g.textBaseline='middle';g.direction=rtl?'rtl':'ltr';g.fillStyle=darker(color);g.font=T;tl.forEach((l,i)=>g.fillText(l,W/2,70+46+i*92));
+  const iw=Math.round(im.naturalWidth*ph/im.naturalHeight),pw=Math.min(W-2*P,iw);g.save();g.beginPath();g.roundRect((W-pw)/2,top,pw,ph,36);g.clip();g.drawImage(im,(W-iw)/2,top,iw,ph);g.restore();
+  let y=top+ph+50;const ix=rtl?W-P-50:P+50,tx=rtl?W-P-130:P+130;
+  for(const [icon,lines] of items){const h=Math.max(110,lines.length*58+40);
+    g.fillStyle=color;g.globalAlpha=.12;g.beginPath();g.roundRect(P-10,y,W-2*P+20,h-16,28);g.fill();g.globalAlpha=1;
+    g.font='54px sans-serif';g.textAlign='center';g.fillText(icon,ix,y+(h-16)/2);
+    g.font=R;g.fillStyle='#1f2a26';g.textAlign=rtl?'right':'left';lines.forEach((l,i)=>g.fillText(l,tx,y+(h-16)/2-(lines.length-1)*29+i*58));
+    y+=h}
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.9));
+}
+// Without AI photos, the wizard still fills the page with posters built from the seller's own photos.
+async function codePosters(copy,photos,color,rtl,niche){
+  const caps=copy.image_captions||[],subs=copy.image_subcaptions||[],at=i=>photos[i%photos.length],out=[];
+  const jobs=[
+    ()=>posterPng(at(0),{t:caps[0]||copy.headline,s:subs[0]||copy.subheadline},color,rtl,niche,'image/jpeg'),
+    ()=>(copy.problems||[]).length&&listPng(at(1),copy.problem_title||copy.headline,[...copy.problems.slice(0,4).map(p=>['❌',p]),...(copy.solution?[['✅',copy.solution]]:[])],color,rtl),
+    ()=>posterPng(at(2),{t:caps[1]||copy.bullets?.[0]||'',s:subs[1]||''},color,rtl,niche,'image/jpeg'),
+    ()=>(copy.features||[]).length&&listPng(at(3),rtl?'علاش غادي يعجبك؟':'Why you will love it',copy.features.slice(0,4).map(f=>[f.icon||'⭐',f.title+(f.text?': '+f.text:'')]),color,rtl),
+    ()=>posterPng(at(4),{t:caps[2]||copy.bullets?.[1]||'',s:subs[2]||''},color,rtl,niche,'image/jpeg')
+  ];
+  for(const job of jobs){try{const blob=await job();if(blob)out.push((await api('/api/landing/image',null,blob)).id)}catch(x){console.warn('poster',x)}}
+  return out;
 }
 $('dlPosters').onclick=async()=>{
   const list=[...(cur.images[0]?[[cur.images[0],{t:$('headline').value||$('product').value,s:$('subheadline').value}]]:[]),...cur.scene_images.map(id=>[id,cur.scene_captions[id]||{}])];
