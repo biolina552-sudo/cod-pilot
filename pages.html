@@ -120,7 +120,7 @@ const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDE
 const say=(t,bad)=>{const m=$('msg');m.textContent=t||'';m.classList.toggle('err',!!bad);if(t)m.scrollIntoView({block:'nearest'})};
 const errText=e=>ERR[e]||('وقع مشكل: '+e);
 // Adds Gemini's own reason (owner-only) so a failure can be sent to support as is.
-const errOf=x=>errOf(x)+(x.detail?' ['+x.detail+']':'');
+const errOf=x=>errText(x.message)+(x.detail?' ['+x.detail+']':'');
 let shop='',ai=false,pages=[],cur=null,wImages=[],niches=[];
 
 async function api(path,body,raw){
