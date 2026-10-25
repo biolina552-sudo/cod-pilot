@@ -2,7 +2,7 @@
 // Public pages are served by the separate shop worker (shop/entry.js).
 const LP_IMAGE_TYPES={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
 const LP_IMAGE_LIMIT=5*1024*1024;
-const LP_TEXT_MODEL='gemini-3.6-flash',LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-nano-banana-2.1'];
+const LP_TEXT_MODEL='gemini-3.6-flash',LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-3.1-flash-image-preview','gemini-2.5-flash-image','gemini-nano-banana-2.1'];
 const lpHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 function lpB64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(s)}
 function lpSniff(b){
@@ -32,11 +32,28 @@ async function lpGemini(env,model,body){
   if(!r.ok){
     const msg=(await r.text()).split(env.GEMINI_API_KEY.trim()).join('[REDACTED]').slice(0,300);
     console.error('LANDING_AI',model,r.status,msg);
-    throw Object.assign(Error('provider'),{code:r.status===429?'GEMINI_RATE_LIMITED':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
+    throw Object.assign(Error('provider'),{code:r.status===429?(/limit: 0\b|free_tier/i.test(msg)?'AI_IMAGE_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
   }
   const d=await r.json();
   if(d.promptFeedback?.blockReason)throw Object.assign(Error('blocked'),{code:'AI_CONTENT_BLOCKED'});
   return d.candidates?.[0]?.content?.parts||[];
+}
+
+// Image model names change often: ask Gemini which image models this key can use,
+// preferring the known names, and remember the answer while the worker is warm.
+let lpImageModelCache=null;
+async function lpImageModels(env){
+  if(lpImageModelCache)return lpImageModelCache;
+  let found=[];
+  try{
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',{headers:{'x-goog-api-key':env.GEMINI_API_KEY.trim()},signal:AbortSignal.timeout(10000)});
+    if(r.ok)found=((await r.json()).models||[]).filter(m=>/image/i.test(m.name)&&!/imagen/i.test(m.name)&&(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,''));
+  }catch{}
+  const rank=m=>{const i=LP_IMAGE_MODELS.indexOf(m);return i<0?LP_IMAGE_MODELS.length:i};
+  found.sort((a,b)=>rank(a)-rank(b)||b.localeCompare(a));
+  const list=[...new Set([...found,...LP_IMAGE_MODELS])];
+  if(found.length)lpImageModelCache=list;
+  return list;
 }
 
 const LP_LANG_NAMES={ar:'Moroccan Darija written in Arabic script (natural, the way Moroccans talk; not formal Modern Standard Arabic)',fr:'French',en:'English'};
@@ -47,13 +64,14 @@ const LP_COPY_SCHEMA={type:'object',properties:{
   features:{type:'array',items:{type:'object',properties:{icon:{type:'string'},title:{type:'string'},text:{type:'string'}},required:['icon','title','text']}},
   description:{type:'string'},
   faq:{type:'array',items:{type:'object',properties:{q:{type:'string'},a:{type:'string'}},required:['q','a']}},
-  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}}
-},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts','image_captions']};
+  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}},image_subcaptions:{type:'array',items:{type:'string'}}
+},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts','image_captions','image_subcaptions']};
 
-function lpCopyPrompt(lang,product,notes){
+function lpCopyPrompt(lang,product,notes,niche){
+  const hint=Object.hasOwn(LP_NICHES,niche)?LP_NICHES[niche].hint:"";
   return `You are a senior direct-response copywriter who builds high-converting cash-on-delivery landing pages for Morocco and the Gulf.
 Look carefully at the product photos${product?` (the seller calls it: "${product}")`:''}.${notes?`\nSeller notes: ${notes}`:''}
-Write the whole landing page in ${LP_LANG_NAMES[lang]}.
+${hint?`Niche: ${hint}\n`:''}Write the whole landing page in ${LP_LANG_NAMES[lang]}.
 
 Structure it around the customer's PROBLEM (problem → agitate → solution):
 - headline: name the painful everyday problem or the desired result in one punchy line (max 12 words).
@@ -71,7 +89,8 @@ Structure it around the customer's PROBLEM (problem → agitate → solution):
   (1) the product in use, clearly solving the problem; (2) a close-up of quality, materials and details; (3) a happy customer using it in a modern Moroccan home or setting;
   (4) the "before" frustration moment the product removes, with the product nearby; (5) a clean studio hero shot on a soft colored background matching the brand color;
   (6) the product in a second everyday place (work, car, outdoors, travel... whatever fits); (7) hands showing how easy it is to use, step by step; (8) a lifestyle flat-lay of the product with related everyday items.
-- image_captions: exactly 8 captions, one per image_prompt in the same order, written in the page language. Each is 2-5 words, punchy and benefit-first (e.g. "سخونة فـ 30 دقيقة"), no punctuation at the end. They are printed in big bold letters over the photos.
+- image_captions: exactly 8 poster titles, one per image_prompt in the same order, written in the page language. Each is 2-5 words, printed huge and bold above the photo. The first one names the customer's problem or desired result (e.g. "بلا ما تشعل الفران..."), the others are punchy, benefit-first (e.g. "سخونة فـ 30 دقيقة"). No final punctuation except an optional "...".
+- image_subcaptions: exactly 8 short lines (3-7 words), one per title, printed in a colored ribbon under it, completing or explaining the title (e.g. "كيبقى سخون حتى توصل للخدمة").
 
 Rules: short sentences, simple words, no hashtags. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
 }
@@ -88,7 +107,7 @@ async function handleLanding(request,env,user,u){
       const list=await env.BUCKET.list({prefix:mine,limit:100});
       const pages=(await Promise.all(list.objects.map(o=>env.BUCKET.get(o.key).then(r=>r&&r.json())))).filter(Boolean);
       pages.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
-      return json({success:true,shop,ai:!!env.GEMINI_API_KEY&&user===env.VOICE_OWNER_ID,pages});
+      return json({success:true,shop,ai:!!env.GEMINI_API_KEY&&user===env.VOICE_OWNER_ID,pages,niches:Object.entries(LP_NICHES).map(([id,n])=>({id,name:n.name,color:n.c}))});
     }
     if(u.pathname==='/api/landing/save'&&request.method==='POST'){
       const b=await body();if(!b)return json({success:false,error:'INVALID_PAGE'},400);
@@ -142,12 +161,13 @@ async function handleLanding(request,env,user,u){
       const lang=['ar','fr','en'].includes(b.lang)?b.lang:'ar';
       const parts=await lpImageParts(env,user,b.images);if(!parts)return json({success:false,error:'INVALID_IMAGES'},400);
       const product=typeof b.product==='string'?b.product.slice(0,120).replace(/["\n]/g,' '):'',notes=typeof b.notes==='string'?b.notes.slice(0,1000):'';
-      const out=await lpGemini(env,LP_TEXT_MODEL,{contents:[{parts:[...parts,{text:lpCopyPrompt(lang,product,notes)}]}],generationConfig:{thinkingConfig:{thinkingLevel:'low'},responseMimeType:'application/json',maxOutputTokens:6000,responseSchema:LP_COPY_SCHEMA}});
+      const out=await lpGemini(env,LP_TEXT_MODEL,{contents:[{parts:[...parts,{text:lpCopyPrompt(lang,product,notes,b.niche)}]}],generationConfig:{thinkingConfig:{thinkingLevel:'low'},responseMimeType:'application/json',maxOutputTokens:6000,responseSchema:LP_COPY_SCHEMA}});
       let copy;try{copy=JSON.parse(out.map(p=>p.text||'').join(''))}catch{return json({success:false,error:'INVALID_AI_RESPONSE'},502)}
       copy.slug=String(copy.slug||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'product';
       if(copy.slug.length<3)copy.slug+='-shop';
       copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,8);
-      copy.image_captions=(Array.isArray(copy.image_captions)?copy.image_captions:[]).map(String).map(s=>s.trim().slice(0,60)).slice(0,8);
+      const lines=(v,max)=>(Array.isArray(v)?v:[]).map(String).map(s=>s.trim().slice(0,max)).slice(0,8);
+      copy.image_captions=lines(copy.image_captions,60);copy.image_subcaptions=lines(copy.image_subcaptions,80);
       return json({success:true,copy});
     }
     if(u.pathname==='/api/landing/ai-image'&&request.method==='POST'){
@@ -160,7 +180,8 @@ Scene: ${b.prompt.slice(0,600)}
 Style: high-end advertising photography, natural soft light, sharp focus on the product, realistic people and hands if any, clean uncluttered background. No text, no letters, no logos added, no watermark, no borders.`;
       const req={contents:[{parts:[...parts,{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],imageConfig:{aspectRatio:b.aspect==='4:5'?'4:5':'1:1'}}};
       // Image model names change often: fall back to the next one if a model is gone.
-      let out;for(const model of LP_IMAGE_MODELS){try{out=await lpGemini(env,model,req);break}catch(e){if(e.code!=='AI_MODEL_UNAVAILABLE'||model===LP_IMAGE_MODELS.at(-1))throw e}}
+      const models=await lpImageModels(env);
+      let out;for(const model of models){try{out=await lpGemini(env,model,req);break}catch(e){if(e.code!=='AI_MODEL_UNAVAILABLE'||model===models.at(-1))throw e}}
       const img=out.map(p=>p.inlineData||p.inline_data).find(d=>d?.data);
       if(!img)return json({success:false,error:'AI_NO_IMAGE'},502);
       const bytes=Uint8Array.from(atob(img.data),c=>c.charCodeAt(0)),type=lpSniff(bytes);
