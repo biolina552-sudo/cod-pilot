@@ -29,6 +29,9 @@ ChatGPT Sites sign-in with Cloudflare Access: only emails you allow can open the
 | `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID` | Facebook connection |
 | `N8N_WEBHOOK_KEY`, `N8N_MONITOR_URL` | Old n8n assistant and monitor |
 
+`GEMINI_API_KEY` and `VOICE_OWNER_ID` can also be added as GitHub repository secrets
+(Settings > Secrets and variables > Actions); each deploy copies them to Cloudflare.
+
 For Facebook, add `https://<your workers.dev address>/api/meta/callback` to the Meta app's
 Valid OAuth Redirect URIs.
 
