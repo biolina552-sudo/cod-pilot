@@ -47,8 +47,8 @@ const LP_COPY_SCHEMA={type:'object',properties:{
   features:{type:'array',items:{type:'object',properties:{icon:{type:'string'},title:{type:'string'},text:{type:'string'}},required:['icon','title','text']}},
   description:{type:'string'},
   faq:{type:'array',items:{type:'object',properties:{q:{type:'string'},a:{type:'string'}},required:['q','a']}},
-  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}}
-},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts']};
+  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}}
+},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts','image_captions']};
 
 function lpCopyPrompt(lang,product,notes){
   return `You are a senior direct-response copywriter who builds high-converting cash-on-delivery landing pages for Morocco and the Gulf.
@@ -71,6 +71,7 @@ Structure it around the customer's PROBLEM (problem → agitate → solution):
   (1) the product in use, clearly solving the problem; (2) a close-up of quality, materials and details; (3) a happy customer using it in a modern Moroccan home or setting;
   (4) the "before" frustration moment the product removes, with the product nearby; (5) a clean studio hero shot on a soft colored background matching the brand color;
   (6) the product in a second everyday place (work, car, outdoors, travel... whatever fits); (7) hands showing how easy it is to use, step by step; (8) a lifestyle flat-lay of the product with related everyday items.
+- image_captions: exactly 8 captions, one per image_prompt in the same order, written in the page language. Each is 2-5 words, punchy and benefit-first (e.g. "سخونة فـ 30 دقيقة"), no punctuation at the end. They are printed in big bold letters over the photos.
 
 Rules: short sentences, simple words, no hashtags. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
 }
@@ -146,6 +147,7 @@ async function handleLanding(request,env,user,u){
       copy.slug=String(copy.slug||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'product';
       if(copy.slug.length<3)copy.slug+='-shop';
       copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,8);
+      copy.image_captions=(Array.isArray(copy.image_captions)?copy.image_captions:[]).map(String).map(s=>s.trim().slice(0,60)).slice(0,8);
       return json({success:true,copy});
     }
     if(u.pathname==='/api/landing/ai-image'&&request.method==='POST'){

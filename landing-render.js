@@ -33,6 +33,9 @@ export function lpCleanPage(b){
   const old=lpNum(b.old_price);
   const imgs=list=>(Array.isArray(list)?list:[]).filter(i=>typeof i==='string'&&LP_IMAGE_RE.test(i)).slice(0,8);
   const images=imgs(b.images),scene_images=imgs(b.scene_images);
+  // Short bold captions shown over the AI photos, keyed by image id.
+  const caps=b.scene_captions&&typeof b.scene_captions==='object'?b.scene_captions:{},scene_captions={};
+  for(const id of scene_images){const c=lpLine(caps[id],60);if(c)scene_captions[id]=c}
   const whatsapp=lpStr(b.whatsapp,20).replace(/[^\d]/g,'');
   const meta=lpStr(b.meta_pixel,20),tiktok=lpStr(b.tiktok_pixel,30).toUpperCase();
   if(meta&&!/^\d{5,20}$/.test(meta))return {error:'INVALID_META_PIXEL'};
@@ -40,7 +43,7 @@ export function lpCleanPage(b){
   if(whatsapp&&(whatsapp.length<8||whatsapp.length>15))return {error:'INVALID_WHATSAPP'};
   const color=/^#[0-9a-f]{6}$/i.test(b.color||'')?b.color.toLowerCase():'#196c58';
   return {page:{
-    slug,lang,product,currency,offers,color,images,scene_images,whatsapp,meta_pixel:meta,tiktok_pixel:tiktok,
+    slug,lang,product,currency,offers,color,images,scene_images,scene_captions,whatsapp,meta_pixel:meta,tiktok_pixel:tiktok,
     published:b.published!==false,
     headline:lpLine(b.headline,160),
     subheadline:lpLine(b.subheadline,300),
@@ -108,7 +111,7 @@ label{display:block;margin:10px 0 4px;font-weight:600;font-size:15px}input{width
 button{width:100%;margin-top:16px;padding:15px;border:0;border-radius:12px;background:var(--c);color:#fff;font:800 20px 'Cairo',system-ui;cursor:pointer;animation:pulse 2s infinite}button:disabled{opacity:.6;animation:none}@keyframes pulse{50%{transform:scale(1.02)}}
 .hp{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);opacity:0}
 .sticky{position:fixed;bottom:0;left:0;right:0;padding:10px 14px;background:#fff;box-shadow:0 -4px 16px rgba(0,0,0,.08);text-align:center}.sticky a{display:block;max-width:532px;margin:0 auto;padding:13px;border-radius:12px;background:var(--c);color:#fff;font-weight:800;font-size:18px;text-decoration:none}
-.scene{width:100%;display:block;margin:14px 0}.prob{background:#fff7f5}.prob ul{list-style:none;padding:0;margin:0}.prob li{padding:8px 0}.prob li:before{content:"✖";color:#d92d20;font-weight:800;margin-inline-end:10px}.sol{background:#fff;border-inline-start:4px solid var(--c);padding:12px 14px;border-radius:10px;font-weight:700;margin:14px 0 6px}
+.scene{position:relative;margin:14px 0}.scene img{width:100%;display:block}.scene figcaption{position:absolute;left:0;right:0;bottom:0;padding:48px 18px 18px;background:linear-gradient(transparent,rgba(0,0,0,.78));color:#fff;font:800 27px/1.3 'Cairo',system-ui,sans-serif;text-align:center;text-shadow:0 2px 6px rgba(0,0,0,.5)}.scene figcaption span{background:var(--c);padding:2px 12px;border-radius:8px;box-decoration-break:clone;-webkit-box-decoration-break:clone}.prob{background:#fff7f5}.prob ul{list-style:none;padding:0;margin:0}.prob li{padding:8px 0}.prob li:before{content:"✖";color:#d92d20;font-weight:800;margin-inline-end:10px}.sol{background:#fff;border-inline-start:4px solid var(--c);padding:12px 14px;border-radius:10px;font-weight:700;margin:14px 0 6px}
 section.pad h2{font-size:22px;text-align:center;margin:10px 0 14px}
 .feat{display:grid;grid-template-columns:1fr 1fr;gap:10px}.feat div{background:#f6f8f6;border-radius:14px;padding:14px}.feat span{font-size:28px;display:block}.feat b{display:block;margin:4px 0}.feat p{margin:0;font-size:15px;color:#4b5853;line-height:1.6}
 details{border-bottom:1px solid #eef0ee;padding:10px 0}summary{font-weight:700;cursor:pointer}details p{margin:8px 0 0;color:#4b5853}
@@ -126,7 +129,7 @@ export function lpRenderPage(page,{values={},errors={},img=id=>'/img/'+id,base='
   const gallery=page.images.length?`<div class="gallery">${page.images.map((id,i)=>`<img src="${lpEsc(img(id))}" alt="${lpEsc(page.product)}"${i?' loading="lazy"':''}>`).join('')}</div>`:'';
   const offers=page.offers.length>1?`<label>${t.offer}</label><div class="offers">${page.offers.map((o,i)=>`<label><span><input type="radio" name="offer" value="${i}"${i===chosen?' checked':''}> ${lpEsc(o.label||o.qty+' '+t.piece)}</span><span class="op">${lpEsc(lpMoney(o.price,page.currency,page.lang))}</span></label>`).join('')}</div>${e('offer')}`:'<input type="hidden" name="offer" value="0">';
   const desc=page.description?`<div class="desc">${page.description.split(/\n+/).map(p=>`<p>${lpEsc(p)}</p>`).join('')}</div>`:'';
-  const scenes=page.scene_images||[],scene=i=>scenes[i]?`<img class="scene" src="${lpEsc(img(scenes[i]))}" alt="${lpEsc(page.product)}" loading="lazy">`:'';
+  const scenes=page.scene_images||[],scene=i=>{if(!scenes[i])return '';const cap=(page.scene_captions||{})[scenes[i]];return `<figure class="scene"><img src="${lpEsc(img(scenes[i]))}" alt="${lpEsc(cap||page.product)}" loading="lazy">${cap?`<figcaption><span>${lpEsc(cap)}</span></figcaption>`:''}</figure>`};
   const features=(page.features||[]).length?`<section class="pad"><h2>${t.why}</h2><div class="feat">${page.features.map(f=>`<div><span>${lpEsc(f.icon||'⭐')}</span><b>${lpEsc(f.title)}</b><p>${lpEsc(f.text)}</p></div>`).join('')}</div></section>`:'';
   const problem=(page.problems||[]).length?`<section class="pad prob"><h2>${lpEsc(page.problem_title||t.problem)}</h2><ul>${page.problems.map(x=>`<li>${lpEsc(x)}</li>`).join('')}</ul>${page.solution?`<p class="sol">${lpEsc(page.solution)}</p>`:''}</section>`:'';
   const faq=(page.faq||[]).length?`<section class="pad"><h2>${t.faq}</h2>${page.faq.map(f=>`<details><summary>${lpEsc(f.q)}</summary><p>${lpEsc(f.a)}</p></details>`).join('')}</section>`:'';

@@ -78,6 +78,13 @@ r=await call('/api/orders/status',{body:{id:orders.items[0].id,status:'confirmed
 assert.equal((await call('/api/orders/status',{body:{id:orders.items[0].id,status:'paid'}})).status,400);
 assert.equal((await call('/api/orders/status',{user:'other@test.com',body:{id:orders.items[0].id,status:'cancelled'}})).status,404);
 
+// Captions over AI photos: only for this page's scene images, escaped.
+const scenePage=(await (await call('/api/landing/save',{body:{...draft,slug:'caption-test',scene_images:[up.id],scene_captions:{[up.id]:'سخونة <b>فـ 30 دقيقة</b>','ffffffffffffffffffffffff.jpg':'x'}}})).json()).page;
+assert.deepEqual(Object.keys(scenePage.scene_captions),[up.id]);
+const capHtml=await (await shopGet('/caption-test')).text();
+assert.ok(capHtml.includes('<figcaption><span>سخونة &lt;b&gt;فـ 30 دقيقة&lt;/b&gt;</span></figcaption>'));
+await call('/api/landing/delete',{body:{id:scenePage.id}});
+
 // Download for other sites: images inline, form posts to the shop, Cairo font.
 r=await call('/api/landing/export?id='+saved.page.id);assert.equal(r.status,200);
 assert.equal(r.headers.get('content-disposition'),'attachment; filename="smart-watch.html"');
@@ -122,4 +129,4 @@ globalThis.fetch=realFetch;
 const html=readFileSync('pages.html','utf8');new Function(html.match(/<script>([\s\S]*)<\/script>/)[1]);
 assert.equal((await call('/pages')).status,200);
 
-console.log('PASS landing pages: auth/CSRF, image sniffing, validation, slug ownership, escaping, pixels, COD orders, honeypot, HTML export, isolation, status, publish/rename/delete, Gemini copy+image, editor syntax');
+console.log('PASS landing pages: auth/CSRF, image sniffing, validation, slug ownership, escaping, pixels, COD orders, honeypot, HTML export, photo captions, isolation, status, publish/rename/delete, Gemini copy+image, editor syntax');
