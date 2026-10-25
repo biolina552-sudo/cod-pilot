@@ -2,7 +2,7 @@
 // Public pages are served by the separate shop worker (shop/entry.js).
 const LP_IMAGE_TYPES={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
 const LP_IMAGE_LIMIT=5*1024*1024;
-const LP_TEXT_MODEL='gemini-3.6-flash',LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-nano-banana-2.1'];
+const LP_TEXT_MODEL='gemini-3.6-flash',LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-3.1-flash-image-preview','gemini-2.5-flash-image','gemini-nano-banana-2.1'];
 const lpHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 function lpB64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(s)}
 function lpSniff(b){
@@ -32,11 +32,28 @@ async function lpGemini(env,model,body){
   if(!r.ok){
     const msg=(await r.text()).split(env.GEMINI_API_KEY.trim()).join('[REDACTED]').slice(0,300);
     console.error('LANDING_AI',model,r.status,msg);
-    throw Object.assign(Error('provider'),{code:r.status===429?'GEMINI_RATE_LIMITED':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
+    throw Object.assign(Error('provider'),{code:r.status===429?(/limit: 0\b|free_tier/i.test(msg)?'AI_IMAGE_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
   }
   const d=await r.json();
   if(d.promptFeedback?.blockReason)throw Object.assign(Error('blocked'),{code:'AI_CONTENT_BLOCKED'});
   return d.candidates?.[0]?.content?.parts||[];
+}
+
+// Image model names change often: ask Gemini which image models this key can use,
+// preferring the known names, and remember the answer while the worker is warm.
+let lpImageModelCache=null;
+async function lpImageModels(env){
+  if(lpImageModelCache)return lpImageModelCache;
+  let found=[];
+  try{
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000',{headers:{'x-goog-api-key':env.GEMINI_API_KEY.trim()},signal:AbortSignal.timeout(10000)});
+    if(r.ok)found=((await r.json()).models||[]).filter(m=>/image/i.test(m.name)&&!/imagen/i.test(m.name)&&(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,''));
+  }catch{}
+  const rank=m=>{const i=LP_IMAGE_MODELS.indexOf(m);return i<0?LP_IMAGE_MODELS.length:i};
+  found.sort((a,b)=>rank(a)-rank(b)||b.localeCompare(a));
+  const list=[...new Set([...found,...LP_IMAGE_MODELS])];
+  if(found.length)lpImageModelCache=list;
+  return list;
 }
 
 const LP_LANG_NAMES={ar:'Moroccan Darija written in Arabic script (natural, the way Moroccans talk; not formal Modern Standard Arabic)',fr:'French',en:'English'};
@@ -163,7 +180,8 @@ Scene: ${b.prompt.slice(0,600)}
 Style: high-end advertising photography, natural soft light, sharp focus on the product, realistic people and hands if any, clean uncluttered background. No text, no letters, no logos added, no watermark, no borders.`;
       const req={contents:[{parts:[...parts,{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],imageConfig:{aspectRatio:b.aspect==='4:5'?'4:5':'1:1'}}};
       // Image model names change often: fall back to the next one if a model is gone.
-      let out;for(const model of LP_IMAGE_MODELS){try{out=await lpGemini(env,model,req);break}catch(e){if(e.code!=='AI_MODEL_UNAVAILABLE'||model===LP_IMAGE_MODELS.at(-1))throw e}}
+      const models=await lpImageModels(env);
+      let out;for(const model of models){try{out=await lpGemini(env,model,req);break}catch(e){if(e.code!=='AI_MODEL_UNAVAILABLE'||model===models.at(-1))throw e}}
       const img=out.map(p=>p.inlineData||p.inline_data).find(d=>d?.data);
       if(!img)return json({success:false,error:'AI_NO_IMAGE'},502);
       const bytes=Uint8Array.from(atob(img.data),c=>c.charCodeAt(0)),type=lpSniff(bytes);

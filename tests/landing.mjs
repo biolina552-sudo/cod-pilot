@@ -120,7 +120,10 @@ assert.equal((await call('/api/landing/save',{body:{...draft,slug:'a-only'}})).s
 
 // AI copy and image call Gemini with the user's own photos only.
 const calls=[];const realFetch=globalThis.fetch;
-globalThis.fetch=async(url,opt)=>{calls.push({url:String(url),body:JSON.parse(opt.body),headers:opt.headers});
+globalThis.fetch=async(url,opt)=>{
+  // The model list says which image models the key has; unknown names are skipped.
+  if(String(url).includes('/models?'))return new Response(JSON.stringify({models:[{name:'models/gemini-9-flash-image-preview',supportedGenerationMethods:['generateContent']},{name:'models/imagen-5',supportedGenerationMethods:['predict']},{name:'models/gemini-3.6-flash',supportedGenerationMethods:['generateContent']}]}));
+  calls.push({url:String(url),body:JSON.parse(opt.body),headers:opt.headers});
   if(String(url).includes('image'))return new Response(JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:'image/png',data:Buffer.from([0x89,0x50,0x4e,0x47,1,2,3]).toString('base64')}}]}}]}));
   return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({product:'ساعة',slug:'Montre Smart!!',headline:'h',subheadline:'s',problem_title:'p',problems:['a'],solution:'b',bullets:['c'],features:[],description:'d',faq:[],cta:'اطلب',color:'#123456',image_prompts:['x','y','z','w']})}]}}]}));};
 const otherImg=(await (await call('/api/landing/image',{user:'other@test.com',raw:jpeg})).json()).id;
@@ -131,6 +134,9 @@ assert.ok(calls[0].body.contents[0].parts[0].inline_data.data);assert.ok(/Darija
 assert.equal(calls[0].headers['x-goog-api-key'],'test-gemini-key');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}});const gen=await r.json();
 assert.match(gen.id,/\.png$/);assert.deepEqual(calls[1].body.generationConfig.responseModalities,['IMAGE']);
+assert.ok(calls[1].url.includes('/gemini-9-flash-image-preview:'));
+{const keep=globalThis.fetch;globalThis.fetch=async(url,opt)=>String(url).includes('/models?')?keep(url,opt):new Response('{"error":{"message":"Quota exceeded, limit: 0, model: x free_tier"}}',{status:429});
+r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.equal((await r.json()).error,'AI_IMAGE_NEEDS_BILLING');globalThis.fetch=keep}
 globalThis.fetch=async()=>new Response('{"error":{"message":"API_KEY_INVALID test-gemini-key"}}',{status:400});
 r=await call('/api/landing/ai-copy',{body:{images:[up.id]}});assert.equal((await r.json()).error,'GEMINI_AUTH_FAILED');
 globalThis.fetch=async()=>{throw new DOMException('timed out','TimeoutError')};
