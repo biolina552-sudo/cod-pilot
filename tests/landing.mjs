@@ -107,7 +107,7 @@ globalThis.fetch=async(url,opt)=>{calls.push({url:String(url),body:JSON.parse(op
 const otherImg=(await (await call('/api/landing/image',{user:'other@test.com',raw:jpeg})).json()).id;
 assert.equal((await call('/api/landing/ai-copy',{body:{images:[otherImg]}})).status,400);
 r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});const copy=(await r.json()).copy;
-assert.equal(copy.slug,'montre-smart');assert.equal(copy.image_prompts.length,3);
+assert.equal(copy.slug,'montre-smart');assert.equal(copy.image_prompts.length,4);
 assert.ok(calls[0].body.contents[0].parts[0].inline_data.data);assert.ok(/Darija/.test(calls[0].body.contents[0].parts.at(-1).text));
 assert.equal(calls[0].headers['x-goog-api-key'],'test-gemini-key');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}});const gen=await r.json();

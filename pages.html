@@ -38,7 +38,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     </div>
     <label>سمية المنتج <span class="hint">(اختياري)</span><input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
     <label>معلومات زايدة <span class="hint">(اختياري: المشكل اللي كيحل، شكون الزبون...)</span><textarea id="wNotes" maxlength="1000" style="min-height:60px"></textarea></label>
-    <label><input type="checkbox" id="wImages" checked> ولد 3 تصاور احترافية بالذكاء الاصطناعي</label>
+    <label>شحال من تصويرة احترافية يولد الذكاء الاصطناعي؟<select id="wCount"><option value="0">بلا تصاور</option><option value="3">3 تصاور</option><option value="6" selected>6 تصاور</option><option value="8">8 تصاور</option></select></label>
     <p><button class="big" id="wGo">✨ صاوب الصفحة</button></p>
     <ol class="steps" id="wSteps" hidden></ol>
   </section>
@@ -157,13 +157,19 @@ $('wGo').onclick=async()=>{
   if(!wImages.length)return say('زيد على الأقل تصويرة وحدة ديال المنتج.',true);
   if(!(price>0))return say('دخل الثمن.',true);
   if(!ai)return say(errText('AI_NOT_CONFIGURED'),true);
-  const lang=$('wLang').value,gen=$('wImages').checked;
-  const list=['كنحلل التصاور ونكتب النص (المشكل، الحل، المميزات...)',...(gen?['كنولد تصويرة احترافية 1','كنولد تصويرة احترافية 2','كنولد تصويرة احترافية 3']:[]),'الصفحة واجدة للمراجعة'];
+  const lang=$('wLang').value,count=+$('wCount').value;
+  const list=['كنحلل التصاور ونكتب النص (المشكل، الحل، المميزات...)',...(count?['كنولد '+count+' تصاور احترافية (كل وحدة كتاخد شي نص دقيقة)']:[]),'الصفحة واجدة للمراجعة'];
   $('wGo').disabled=true;say('');steps(list,0);
   try{
     const {copy}=await api('/api/landing/ai-copy',{images:wImages,lang,product:$('wProduct').value,notes:$('wNotes').value});
     const scenes=[];
-    if(gen)for(let i=0;i<copy.image_prompts.length&&i<3;i++){steps(list,i+1);try{scenes.push((await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:copy.image_prompts[i]})).id)}catch(x){say('تصويرة '+(i+1)+': '+errText(x.message),true)}}
+    if(count){
+      // Two at a time: faster, without hitting Gemini's rate limit.
+      const prompts=copy.image_prompts.slice(0,count),got=new Array(prompts.length);let next=0,done=0;
+      steps(list,1);const li=$('wSteps').children[1],label=li.textContent;
+      const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:prompts[i]})).id}catch(x){say('تصويرة '+(i+1)+': '+errText(x.message),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
+      await Promise.all([worker(),worker()]);scenes.push(...got.filter(Boolean));
+    }
     steps(list,list.length-1);
     const old=parseFloat($('wOld').value);
     openEditor({...copy,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,published:true,ask_address:false,_prompts:copy.image_prompts});
@@ -200,7 +206,7 @@ function drawImages(){
 }
 $('moreImages').onchange=async e=>{const files=[...e.target.files];e.target.value='';say('كنرفع التصاور...');try{cur.images.push(...await upload(files));say('')}catch(x){say(errText(x.message),true)}drawImages()};
 $('genScene').onclick=async()=>{
-  const prompt=$('scenePrompt').value.trim()||cur._prompts?.[cur.scene_images.length%3]||'the product in use in a bright modern Moroccan home';
+  const prompt=$('scenePrompt').value.trim()||cur._prompts?.[cur.scene_images.length%(cur._prompts.length||1)]||'the product in use in a bright modern Moroccan home';
   if(!cur.images.length)return say('زيد تصويرة ديال المنتج الأول.',true);
   $('genScene').disabled=true;say('⏳ كنولد التصويرة... (حتى دقيقة)');
   try{cur.scene_images.push((await api('/api/landing/ai-image',{images:cur.images.slice(0,3),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errText(x.message),true)}

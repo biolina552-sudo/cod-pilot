@@ -67,7 +67,10 @@ Structure it around the customer's PROBLEM (problem → agitate → solution):
 - cta: a 2-4 word order button.
 - product: a short product name. slug: 2-4 lowercase latin words joined by "-" for the URL.
 - color: one hex brand color that fits the product photos and stays readable with white text.
-- image_prompts: exactly 3 English descriptions of realistic lifestyle photo scenes for this product: (1) the product in use solving the problem, (2) a close-up showing quality and details, (3) a happy customer in a modern Moroccan home or setting using it.
+- image_prompts: exactly 8 English descriptions of different, realistic photo scenes for this product, in this order:
+  (1) the product in use, clearly solving the problem; (2) a close-up of quality, materials and details; (3) a happy customer using it in a modern Moroccan home or setting;
+  (4) the "before" frustration moment the product removes, with the product nearby; (5) a clean studio hero shot on a soft colored background matching the brand color;
+  (6) the product in a second everyday place (work, car, outdoors, travel... whatever fits); (7) hands showing how easy it is to use, step by step; (8) a lifestyle flat-lay of the product with related everyday items.
 
 Rules: short sentences, simple words, no hashtags. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
 }
@@ -142,7 +145,7 @@ async function handleLanding(request,env,user,u){
       let copy;try{copy=JSON.parse(out.map(p=>p.text||'').join(''))}catch{return json({success:false,error:'INVALID_AI_RESPONSE'},502)}
       copy.slug=String(copy.slug||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'product';
       if(copy.slug.length<3)copy.slug+='-shop';
-      copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,3);
+      copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,8);
       return json({success:true,copy});
     }
     if(u.pathname==='/api/landing/ai-image'&&request.method==='POST'){
