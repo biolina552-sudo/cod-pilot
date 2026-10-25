@@ -12,5 +12,5 @@ bucket_name = "cod-pilot-media"
 
 # Not secret: fill these in after creating the Cloudflare Access application.
 [vars]
-ACCESS_TEAM_DOMAIN = ""
-ACCESS_AUD = ""
+ACCESS_TEAM_DOMAIN = "aged-night-ddd1.cloudflareaccess.com"
+ACCESS_AUD = "8f5883519ad65cd72203fc6ed798da7d46ab8c87de2eb440fbb65bf013291062"
