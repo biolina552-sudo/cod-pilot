@@ -91,11 +91,15 @@ async function handleLanding(request,env,user,u){
       const {page,error}=lpCleanPage(b);if(error)return json({success:false,error},400);
       const id=typeof b.id==='string'&&/^[a-f0-9]{16}$/.test(b.id)?b.id:lpHex(8);
       const prevObj=await env.BUCKET.get(mine+id+'.json'),prev=prevObj&&await prevObj.json();
-      const taken=await env.BUCKET.get('public-pages/'+page.slug+'.json');
-      if(taken&&(await taken.json()).owner!==user)return json({success:false,error:'SLUG_TAKEN'},409);
+      const takenObj=await env.BUCKET.get('public-pages/'+page.slug+'.json'),taken=takenObj&&await takenObj.json();
+      if(taken&&(taken.owner!==user||taken.id!==id))return json({success:false,error:'SLUG_TAKEN'},409);
       const saved={...page,id,created_at:prev?.created_at||new Date().toISOString(),updated_at:new Date().toISOString()};
       await env.BUCKET.put(mine+id+'.json',JSON.stringify(saved),{httpMetadata:{contentType:'application/json'}});
-      if(prev&&prev.slug!==page.slug)await env.BUCKET.delete('public-pages/'+prev.slug+'.json');
+      if(prev&&prev.slug!==page.slug){
+        // The old slug may have been taken by someone else since: only remove our own copy.
+        const old=await env.BUCKET.get('public-pages/'+prev.slug+'.json');
+        if(old){const op=await old.json();if(op.owner===user&&op.id===id)await env.BUCKET.delete('public-pages/'+prev.slug+'.json')}
+      }
       if(page.published)await env.BUCKET.put('public-pages/'+page.slug+'.json',JSON.stringify({...saved,owner:user}),{httpMetadata:{contentType:'application/json'}});
       else if(taken)await env.BUCKET.delete('public-pages/'+page.slug+'.json');
       return json({success:true,page:saved,url:shop?shop+'/'+page.slug:null});
@@ -164,7 +168,7 @@ Style: high-end advertising photography, natural soft light, sharp focus on the 
     }
     return json({success:false,error:'NOT_FOUND'},404);
   }catch(e){
-    if(e?.code)return json({success:false,error:e.code},502);
+    if(typeof e?.code==='string')return json({success:false,error:e.code},502);
     console.error('LANDING',String(e?.name),String(e?.message).slice(0,200));
     return json({success:false,error:e?.name==='TimeoutError'?'AI_TIMEOUT':'SERVER_ERROR'},500);
   }

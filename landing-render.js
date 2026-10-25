@@ -78,13 +78,16 @@ function lpJs(v){return JSON.stringify(v).replace(/</g,'\\u003c')}
 const LP_AR_CUR={MAD:'درهم',SAR:'ريال',AED:'درهم',QAR:'ريال',OMR:'ريال',KWD:'دينار',BHD:'دينار'};
 function lpMoney(n,c,lang){return (Number.isInteger(n)?String(n):n.toFixed(2))+' '+(lang==='ar'&&LP_AR_CUR[c]||c)}
 
+// event = {id, data}: the purchase is sent once per order (eventID lets the ad
+// platforms drop duplicates, and the browser remembers orders it already sent).
 function lpPixels(page,event){
   let s='';
+  if(event&&(page.meta_pixel||page.tiktok_pixel))s+=`<script>(function(){var k=${lpJs('lp_order_'+event.id)};try{window.__lpSeen=!!localStorage.getItem(k);localStorage.setItem(k,'1')}catch(e){window.__lpSeen=false}})()</script>`;
   if(page.meta_pixel){
-    s+=`<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel}');fbq('track','PageView');${event?`fbq('track','Purchase',${lpJs(event)});`:''}</script>`;
+    s+=`<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${page.meta_pixel}');fbq('track','PageView');${event?`if(!window.__lpSeen)fbq('track','Purchase',${lpJs(event.data)},{eventID:${lpJs(event.id)}});`:''}</script>`;
   }
   if(page.tiktok_pixel){
-    s+=`<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=d.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('${page.tiktok_pixel}');ttq.page();${event?`ttq.track('CompletePayment',${lpJs(event)});`:''}}(window,document,'ttq');</script>`;
+    s+=`<script>!function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n){var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=i,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};var o=d.createElement("script");o.type="text/javascript",o.async=!0,o.src=i+"?sdkid="+e+"&lib="+t;var a=d.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};ttq.load('${page.tiktok_pixel}');ttq.page();${event?`if(!window.__lpSeen)ttq.track('CompletePayment',${lpJs(event.data)},{event_id:${lpJs(event.id)}});`:''}}(window,document,'ttq');</script>`;
   }
   return s;
 }
@@ -144,9 +147,9 @@ ${page.whatsapp?`<a class="wa" href="https://wa.me/${page.whatsapp}" target="_bl
   return lpShell(page,page.headline||page.product,body);
 }
 
-// The thank-you page; fires the purchase event on the pixels.
-export function lpRenderThanks(page,offerIndex){
-  const t=LP_TEXT[page.lang]||LP_TEXT.ar,o=page.offers[offerIndex]||page.offers[0];
+// The thank-you page. With a stored order it fires the purchase event on the pixels.
+export function lpRenderThanks(page,order){
+  const t=LP_TEXT[page.lang]||LP_TEXT.ar;
   const body=`<div class="done"><div class="ok">✔</div><h1>${lpEsc(page.thanks||t.thanks)}</h1><p><a href="/${page.slug}">${t.back}</a></p></div>${page.whatsapp?`<a class="wa" href="https://wa.me/${page.whatsapp}" target="_blank" rel="noopener">${t.wa}</a>`:''}`;
-  return lpShell(page,page.product,body,{value:o.price,currency:page.currency,content_name:page.product});
+  return lpShell(page,page.product,body,order?{id:order.id,data:{value:order.offer.price,currency:order.currency,content_name:page.product}}:null);
 }

@@ -60,10 +60,17 @@ assert.equal((await shopGet('/img/..%2Fpublic-pages%2Fsmart-watch.json')).status
 const order=f=>shopGet('/smart-watch/order',{method:'POST',body:new URLSearchParams(f)});
 r=await order({name:'A',phone:'12',city:'',offer:'0'});assert.equal(r.status,400);assert.ok((await r.text()).includes('رقم هاتف صحيح'));
 r=await order({name:'Bot',phone:'0612345678',city:'Rabat',offer:'0',website:'spam'});assert.equal(r.status,303);
+assert.equal(r.headers.get('location'),'https://shop.test/smart-watch/thanks');
+assert.ok(!(await (await shopGet('/smart-watch/thanks?q=0')).text()).includes("'Purchase'"));
 assert.equal([...env.BUCKET.m.keys()].filter(k=>k.startsWith('orders/')).length,0);
 r=await order({name:'سعيد',phone:'06 12-34 56 78',city:'الدار البيضاء',offer:'1'});assert.equal(r.status,303);
-assert.equal(r.headers.get('location'),'https://shop.test/smart-watch/thanks?q=1');
-const thanks=await (await shopGet('/smart-watch/thanks?q=1')).text();assert.ok(thanks.includes('"value":349'));
+const loc=r.headers.get('location');assert.match(loc,/^https:\/\/shop\.test\/smart-watch\/thanks\?o=\d{13}-[a-f0-9]{8}$/);
+const thanks=await (await shopGet(loc.slice('https://shop.test'.length))).text();
+assert.ok(thanks.includes('"value":349')&&thanks.includes('eventID:"'+loc.split('o=')[1]+'"')&&thanks.includes('event_id:'));
+assert.ok(!(await (await shopGet('/smart-watch/thanks?o=9999999999999-deadbeef')).text()).includes("'Purchase'"));
+// A body without Content-Length is still capped.
+const big=new ReadableStream({start(c){c.enqueue(new TextEncoder().encode('name='+'x'.repeat(9000)));c.close()}});
+assert.equal((await shopGet('/smart-watch/order',{method:'POST',body:big,duplex:'half'})).status,413);
 let orders=await (await call('/api/orders')).json();assert.equal(orders.items.length,1);
 assert.deepEqual([orders.items[0].phone,orders.items[0].offer.price,orders.items[0].status],['0612345678',349,'new']);
 assert.equal((await (await call('/api/orders',{user:'other@test.com'})).json()).items.length,0);
@@ -76,6 +83,14 @@ await call('/api/landing/save',{body:{...draft,id:saved.page.id,published:false}
 await call('/api/landing/save',{body:{...draft,id:saved.page.id,slug:'watch-pro'}});
 assert.equal((await shopGet('/watch-pro')).status,200);assert.ok(!env.BUCKET.m.has('public-pages/smart-watch.json'));
 await call('/api/landing/delete',{body:{id:saved.page.id}});assert.equal((await shopGet('/watch-pro')).status,404);
+// A's rename must not unpublish B's page that took A's old (unpublished) slug.
+const a=(await (await call('/api/landing/save',{body:{...draft,slug:'shared-slug',published:false}})).json()).page;
+assert.equal((await call('/api/landing/save',{user:'other@test.com',body:{...draft,slug:'shared-slug',images:[]}})).status,200);
+await call('/api/landing/save',{body:{...draft,id:a.id,slug:'a-new-slug',published:false}});
+assert.equal((await shopGet('/shared-slug')).status,200);
+// The same user cannot publish two pages on one slug.
+assert.equal((await call('/api/landing/save',{body:{...draft,slug:'a-only'}})).status,200);
+assert.equal((await call('/api/landing/save',{body:{...draft,slug:'a-only'}})).status,409);
 
 // AI copy and image call Gemini with the user's own photos only.
 const calls=[];const realFetch=globalThis.fetch;
@@ -92,6 +107,8 @@ r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}}
 assert.match(gen.id,/\.png$/);assert.deepEqual(calls[1].body.generationConfig.responseModalities,['IMAGE']);
 globalThis.fetch=async()=>new Response('{"error":{"message":"API_KEY_INVALID test-gemini-key"}}',{status:400});
 r=await call('/api/landing/ai-copy',{body:{images:[up.id]}});assert.equal((await r.json()).error,'GEMINI_AUTH_FAILED');
+globalThis.fetch=async()=>{throw new DOMException('timed out','TimeoutError')};
+r=await call('/api/landing/ai-copy',{body:{images:[up.id]}});assert.equal((await r.json()).error,'AI_TIMEOUT');
 globalThis.fetch=realFetch;
 
 // Editor page script parses.

@@ -215,7 +215,7 @@ $('save').onclick=async()=>{
   $('save').disabled=true;say('كنحفظ...');
   try{
     const d=await api('/api/landing/save',p);cur={...d.page,_prompts:cur._prompts};
-    $('savedLink').innerHTML=d.url&&d.page.published?`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button></p>`:'<p>✔ تحفظات (ماشي منشورة).</p>';
+    $('savedLink').innerHTML=!d.page.published?'<p>✔ تحفظات (ماشي منشورة).</p>':!d.url?'<p>✔ منشورة، ولكن الرابط العمومي (SHOP_ORIGIN) ماشي مضبوط.</p>':`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button></p>`;
     if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
     say('✔ تحفظات.');wImages=[];drawW();$('wSteps').hidden=true;await loadPages();
   }catch(x){say(errText(x.message),true)}
@@ -225,12 +225,13 @@ $('save').onclick=async()=>{
 async function loadPages(){
   try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages}catch(x){$('pageList').innerHTML='';say(errText(x.message),true);return}
   const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
-  for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug;
-    d.innerHTML=`<img alt=""><div><b></b> <span class="badge ${p.published?'on':''}">${p.published?'منشورة':'مخبية'}</span><p class="u" dir="ltr"></p><div class="acts"><button class="e">تعديل</button>${p.published?'<a class="btn light o" target="_blank" rel="noopener">فتح</a><button class="light c">نسخ الرابط</button>':''}<button class="danger x">حذف</button></div></div>`;
+  if(!shop)say('رابط الصفحات العمومية (SHOP_ORIGIN) ماشي مضبوط، فالروابط مازال مايبانوش.',true);
+  for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug,live=p.published&&!!shop;
+    d.innerHTML=`<img alt=""><div><b></b> <span class="badge ${p.published?'on':''}">${p.published?'منشورة':'مخبية'}</span><p class="u" dir="ltr"></p><div class="acts"><button class="e">تعديل</button>${live?'<a class="btn light o" target="_blank" rel="noopener">فتح</a><button class="light c">نسخ الرابط</button>':''}<button class="danger x">حذف</button></div></div>`;
     if(p.images[0]||p.scene_images?.[0])d.querySelector('img').src=img(p.images[0]||p.scene_images[0]);
     d.querySelector('b').textContent=p.product;d.querySelector('.u').textContent='/'+p.slug;
     d.querySelector('.e').onclick=()=>openEditor(p);
-    if(p.published){d.querySelector('.o').href=url;d.querySelector('.c').onclick=()=>navigator.clipboard.writeText(url).then(()=>say('✔ تنسخ الرابط.'))}
+    if(live){d.querySelector('.o').href=url;d.querySelector('.c').onclick=()=>navigator.clipboard.writeText(url).then(()=>say('✔ تنسخ الرابط.'))}
     d.querySelector('.x').onclick=async()=>{if(!confirm('نحذفو الصفحة "'+p.product+'"؟ الطلبات القديمة غادي يبقاو.'))return;try{await api('/api/landing/delete',{id:p.id});say('✔ تحذفات.');loadPages()}catch(x){say(errText(x.message),true)}};
     el.append(d)}
   const f=$('fPage'),v=f.value;f.innerHTML='<option value="">الكل</option>'+pages.map(p=>`<option></option>`).join('');[...f.options].slice(1).forEach((o,i)=>{o.value=pages[i].id;o.textContent=pages[i].product});f.value=v;
@@ -240,8 +241,9 @@ async function loadPages(){
 let orders=[],cursor=null;
 Object.entries(STATUS).forEach(([k,v])=>$('fStatus').append(new Option(v,k)));
 function waNumber(p){let d=p.replace(/\D/g,'');if(p.startsWith('+'))return d;if(/^0[5-7]\d{8}$/.test(d))return '212'+d.slice(1);return d}
+function filtered(){const s=$('fStatus').value,pg=$('fPage').value;return orders.filter(o=>(!s||o.status===s)&&(!pg||o.page_id===pg))}
 function drawOrders(){
-  const s=$('fStatus').value,pg=$('fPage').value,list=orders.filter(o=>(!s||o.status===s)&&(!pg||o.page_id===pg));
+  const list=filtered();
   const counts={};orders.forEach(o=>counts[o.status]=(counts[o.status]||0)+1);
   $('summary').innerHTML=Object.entries(STATUS).filter(([k])=>counts[k]).map(([k,v])=>`<span>${v}: <b>${counts[k]}</b></span>`).join('');
   $('newCount').textContent=counts.new?'('+counts.new+')':'';
@@ -263,7 +265,7 @@ async function loadOrders(more){
 $('fStatus').onchange=$('fPage').onchange=drawOrders;$('refresh').onclick=()=>loadOrders();$('more').onclick=()=>loadOrders(true);
 $('csv').onclick=()=>{
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"',rows=[['date','product','offer','qty','price','currency','name','phone','city','address','status']];
-  orders.forEach(o=>rows.push([o.created_at,o.product,o.offer?.label,o.offer?.qty,o.offer?.price,o.currency,o.name,o.phone,o.city,o.address,o.status]));
+  filtered().forEach(o=>rows.push([o.created_at,o.product,o.offer?.label,o.offer?.qty,o.offer?.price,o.currency,o.name,o.phone,o.city,o.address,o.status]));
   // A leading = @ (or + - not followed by a plain number) would run as a formula in Excel: prefix with a quote.
   const csv='﻿'+rows.map(r=>r.map(v=>q(/^[=@]|^[+\-](?!\d+$)/.test(String(v??''))?"'"+v:v)).join(',')).join('\r\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='orders-'+new Date().toISOString().slice(0,10)+'.csv';a.click();

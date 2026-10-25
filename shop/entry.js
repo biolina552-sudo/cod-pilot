@@ -16,6 +16,16 @@ export function orderId(now=Date.now()){
   return String(9999999999999-now).padStart(13,'0')+'-'+rand;
 }
 
+// Reads at most `limit` bytes, even when Content-Length is missing; null if larger.
+async function readLimited(request,limit){
+  if(Number(request.headers.get('content-length')||0)>limit)return null;
+  if(!request.body)return new Uint8Array();
+  const reader=request.body.getReader(),chunks=[];let size=0;
+  for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>limit){await reader.cancel();return null}chunks.push(value)}
+  const out=new Uint8Array(size);let at=0;for(const c of chunks){out.set(c,at);at+=c.length}
+  return out;
+}
+
 async function loadPage(env,slug){
   if(!LP_SLUG_RE.test(slug))return null;
   const o=await env.BUCKET.get('public-pages/'+slug+'.json');
@@ -43,13 +53,19 @@ export default {async fetch(request,env){
   if(!page)return notFound();
 
   if(!m[2]&&request.method==='GET')return html(lpRenderPage(page));
-  if(m[2]==='thanks'&&request.method==='GET')return html(lpRenderThanks(page,parseInt(u.searchParams.get('q')||'0',10)));
+  if(m[2]==='thanks'&&request.method==='GET'){
+    // Only a real order (its id is in the link) fires the purchase pixel.
+    const id=u.searchParams.get('o')||'';let order=null;
+    if(/^\d{13}-[a-f0-9]{8}$/.test(id)){const o=await env.BUCKET.get('orders/'+encodeURIComponent(page.owner)+'/'+id+'.json');if(o){const r=await o.json();if(r.page_id===page.id)order=r}}
+    return html(lpRenderThanks(page,order));
+  }
   if(m[2]==='order'&&request.method==='POST'){
-    if(Number(request.headers.get('content-length')||0)>8000)return new Response('Too large',{status:413});
-    let form;try{form=Object.fromEntries(await request.formData())}catch{return html(lpRenderPage(page),400)}
-    const thanks=i=>Response.redirect(u.origin+'/'+page.slug+'/thanks?q='+i,303);
+    const raw=await readLimited(request,8000);
+    if(raw===null)return new Response('Too large',{status:413});
+    const form=Object.fromEntries(new URLSearchParams(new TextDecoder().decode(raw)));
+    const thanks=id=>Response.redirect(u.origin+'/'+page.slug+'/thanks'+(id?'?o='+id:''),303);
     // Bots fill the hidden field: pretend it worked and store nothing.
-    if(form.website)return thanks(0);
+    if(form.website)return thanks('');
     const {order,errors}=lpCleanOrder(page,form);
     if(errors)return html(lpRenderPage(page,{values:form,errors}),400);
     const offer=page.offers[order.offer],id=orderId();
@@ -59,7 +75,7 @@ export default {async fetch(request,env){
     const data=JSON.stringify(record);
     // The order also goes in metadata (when it fits) so the app lists orders in one call.
     await env.BUCKET.put('orders/'+encodeURIComponent(page.owner)+'/'+id+'.json',data,{httpMetadata:{contentType:'application/json'},customMetadata:new TextEncoder().encode(data).length<1900?{d:data}:{}});
-    return thanks(order.offer);
+    return thanks(id);
   }
   return new Response('Method not allowed',{status:405});
 }};
