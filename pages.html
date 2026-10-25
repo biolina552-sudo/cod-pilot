@@ -215,8 +215,8 @@ $('save').onclick=async()=>{
   $('save').disabled=true;say('كنحفظ...');
   try{
     const d=await api('/api/landing/save',p);cur={...d.page,_prompts:cur._prompts};
-    $('savedLink').innerHTML=!d.page.published?'<p>✔ تحفظات (ماشي منشورة).</p>':!d.url?'<p>✔ منشورة، ولكن الرابط العمومي (SHOP_ORIGIN) ماشي مضبوط.</p>':`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button></p>`;
-    if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
+    $('savedLink').innerHTML=!d.page.published?'<p>✔ تحفظات (ماشي منشورة).</p>':!d.url?'<p>✔ منشورة، ولكن الرابط العمومي (SHOP_ORIGIN) ماشي مضبوط.</p>':`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button><a class="btn light" id="dlLink">⬇ تنزيل HTML</a></p><p class="hint">ملف HTML تقدر تحطو فـ Shopify ولا YouCan ولا أي موقع. الطلبات غادي توصلك هنا ديما، والصفحة خاصها تبقى منشورة.</p>`;
+    if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('dlLink').href='/api/landing/export?id='+d.page.id;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
     say('✔ تحفظات.');wImages=[];drawW();$('wSteps').hidden=true;await loadPages();
   }catch(x){say(errText(x.message),true)}
   $('save').disabled=false;
@@ -227,11 +227,11 @@ async function loadPages(){
   const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
   if(!shop)say('رابط الصفحات العمومية (SHOP_ORIGIN) ماشي مضبوط، فالروابط مازال مايبانوش.',true);
   for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug,live=p.published&&!!shop;
-    d.innerHTML=`<img alt=""><div><b></b> <span class="badge ${p.published?'on':''}">${p.published?'منشورة':'مخبية'}</span><p class="u" dir="ltr"></p><div class="acts"><button class="e">تعديل</button>${live?'<a class="btn light o" target="_blank" rel="noopener">فتح</a><button class="light c">نسخ الرابط</button>':''}<button class="danger x">حذف</button></div></div>`;
+    d.innerHTML=`<img alt=""><div><b></b> <span class="badge ${p.published?'on':''}">${p.published?'منشورة':'مخبية'}</span><p class="u" dir="ltr"></p><div class="acts"><button class="e">تعديل</button>${live?'<a class="btn light o" target="_blank" rel="noopener">فتح</a><button class="light c">نسخ الرابط</button><a class="btn light d">⬇ HTML</a>':''}<button class="danger x">حذف</button></div></div>`;
     if(p.images[0]||p.scene_images?.[0])d.querySelector('img').src=img(p.images[0]||p.scene_images[0]);
     d.querySelector('b').textContent=p.product;d.querySelector('.u').textContent='/'+p.slug;
     d.querySelector('.e').onclick=()=>openEditor(p);
-    if(live){d.querySelector('.o').href=url;d.querySelector('.c').onclick=()=>navigator.clipboard.writeText(url).then(()=>say('✔ تنسخ الرابط.'))}
+    if(live){d.querySelector('.o').href=url;d.querySelector('.d').href='/api/landing/export?id='+p.id;d.querySelector('.d').title='تنزيل الصفحة كملف HTML لموقع آخر';d.querySelector('.c').onclick=()=>navigator.clipboard.writeText(url).then(()=>say('✔ تنسخ الرابط.'))}
     d.querySelector('.x').onclick=async()=>{if(!confirm('نحذفو الصفحة "'+p.product+'"؟ الطلبات القديمة غادي يبقاو.'))return;try{await api('/api/landing/delete',{id:p.id});say('✔ تحذفات.');loadPages()}catch(x){say(errText(x.message),true)}};
     el.append(d)}
   const f=$('fPage'),v=f.value;f.innerHTML='<option value="">الكل</option>'+pages.map(p=>`<option></option>`).join('');[...f.options].slice(1).forEach((o,i)=>{o.value=pages[i].id;o.textContent=pages[i].product});f.value=v;

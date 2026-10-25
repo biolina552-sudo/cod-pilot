@@ -104,6 +104,19 @@ async function handleLanding(request,env,user,u){
       else if(taken)await env.BUCKET.delete('public-pages/'+page.slug+'.json');
       return json({success:true,page:saved,url:shop?shop+'/'+page.slug:null});
     }
+    if(u.pathname==='/api/landing/export'&&request.method==='GET'){
+      // A standalone copy for other sites: images inline, the form posts to the shop.
+      const id=u.searchParams.get('id')||'';if(!/^[a-f0-9]{16}$/.test(id))return json({success:false,error:'INVALID_REQUEST'},400);
+      const o=await env.BUCKET.get(mine+id+'.json');if(!o)return json({success:false,error:'NOT_FOUND'},404);
+      if(!shop)return json({success:false,error:'SHOP_NOT_CONFIGURED'},503);
+      const page=await o.json(),inline={};
+      for(const img of new Set([...page.images,...(page.scene_images||[])])){
+        const r=await env.BUCKET.get('public-images/'+img);
+        inline[img]=r?'data:'+(r.httpMetadata?.contentType||'image/jpeg')+';base64,'+lpB64(new Uint8Array(await r.arrayBuffer())):shop+'/img/'+img;
+      }
+      const html=lpRenderPage(page,{img:i=>inline[i]||shop+'/img/'+i,base:shop});
+      return new Response(html,{headers:{'content-type':'text/html; charset=utf-8','content-disposition':'attachment; filename="'+page.slug+'.html"','cache-control':'no-store','x-content-type-options':'nosniff'}});
+    }
     if(u.pathname==='/api/landing/delete'&&request.method==='POST'){
       const b=await body(1024);if(!b||!/^[a-f0-9]{16}$/.test(b.id||''))return json({success:false,error:'INVALID_REQUEST'},400);
       const o=await env.BUCKET.get(mine+b.id+'.json');if(!o)return json({success:false,error:'NOT_FOUND'},404);

@@ -78,6 +78,13 @@ r=await call('/api/orders/status',{body:{id:orders.items[0].id,status:'confirmed
 assert.equal((await call('/api/orders/status',{body:{id:orders.items[0].id,status:'paid'}})).status,400);
 assert.equal((await call('/api/orders/status',{user:'other@test.com',body:{id:orders.items[0].id,status:'cancelled'}})).status,404);
 
+// Download for other sites: images inline, form posts to the shop, Cairo font.
+r=await call('/api/landing/export?id='+saved.page.id);assert.equal(r.status,200);
+assert.equal(r.headers.get('content-disposition'),'attachment; filename="smart-watch.html"');
+const exported=await r.text();
+assert.ok(exported.includes('src="data:image/jpeg;base64,')&&exported.includes('action="https://shop.test/smart-watch/order"')&&exported.includes('family=Cairo'));
+assert.equal((await call('/api/landing/export?id='+saved.page.id,{user:'other@test.com'})).status,404);
+
 // Unpublish hides the page; slug change moves it; delete removes it.
 await call('/api/landing/save',{body:{...draft,id:saved.page.id,published:false}});assert.equal((await shopGet('/smart-watch')).status,404);
 await call('/api/landing/save',{body:{...draft,id:saved.page.id,slug:'watch-pro'}});
@@ -115,4 +122,4 @@ globalThis.fetch=realFetch;
 const html=readFileSync('pages.html','utf8');new Function(html.match(/<script>([\s\S]*)<\/script>/)[1]);
 assert.equal((await call('/pages')).status,200);
 
-console.log('PASS landing pages: auth/CSRF, image sniffing, validation, slug ownership, escaping, pixels, COD orders, honeypot, isolation, status, publish/rename/delete, Gemini copy+image, editor syntax');
+console.log('PASS landing pages: auth/CSRF, image sniffing, validation, slug ownership, escaping, pixels, COD orders, honeypot, HTML export, isolation, status, publish/rename/delete, Gemini copy+image, editor syntax');

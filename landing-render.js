@@ -92,9 +92,9 @@ function lpPixels(page,event){
   return s;
 }
 
-function lpShell(page,title,body,event){
+function lpShell(page,title,body,event,og){
   const t=LP_TEXT[page.lang]||LP_TEXT.ar;
-  return `<!doctype html><html lang="${page.lang}" dir="${t.dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${lpEsc(title)}</title>${page.images[0]?`<meta property="og:image" content="/img/${page.images[0]}">`:''}<meta property="og:title" content="${lpEsc(title)}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap"><style>
+  return `<!doctype html><html lang="${page.lang}" dir="${t.dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${lpEsc(title)}</title>${og?`<meta property="og:image" content="${lpEsc(og)}">`:''}<meta property="og:title" content="${lpEsc(title)}"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap"><style>
 :root{--c:${page.color}}*{box-sizing:border-box}body{margin:0;background:#f6f6f4;color:#1f2a26;font:17px/1.7 'Cairo',system-ui,sans-serif}html,body{overflow-x:hidden}main{position:relative;max-width:560px;margin:0 auto;background:#fff;min-height:100vh;padding-bottom:90px}
 .gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0}.gallery img{width:100%;flex:0 0 100%;aspect-ratio:1;object-fit:cover;scroll-snap-align:center;display:block}
 .pad{padding:18px 18px 4px}h1{font-size:26px;line-height:1.35;margin:4px 0 6px}.sub{color:#56635e;margin:0 0 10px}.price{display:flex;align-items:baseline;gap:12px;margin:8px 0}.price b{font-size:30px;color:var(--c)}.price s{color:#8a948f;font-size:19px}
@@ -118,13 +118,15 @@ a.cta{display:block;text-align:center;margin:14px 0;padding:14px;border-radius:1
 }
 
 // The public product page with the order form.
-export function lpRenderPage(page,{values={},errors={}}={}){
+// opts.img maps an image id to its URL and opts.base is the shop origin; the
+// downloadable copy sets both so the page works when hosted on another site.
+export function lpRenderPage(page,{values={},errors={},img=id=>'/img/'+id,base=''}={}){
   const t=LP_TEXT[page.lang]||LP_TEXT.ar,v=k=>lpEsc(values[k]??''),e=k=>errors[k]?`<p class="err">${lpEsc(errors[k])}</p>`:'';
   const chosen=Number.isInteger(+values.offer)?+values.offer:0;
-  const gallery=page.images.length?`<div class="gallery">${page.images.map((id,i)=>`<img src="/img/${id}" alt="${lpEsc(page.product)}"${i?' loading="lazy"':''}>`).join('')}</div>`:'';
+  const gallery=page.images.length?`<div class="gallery">${page.images.map((id,i)=>`<img src="${lpEsc(img(id))}" alt="${lpEsc(page.product)}"${i?' loading="lazy"':''}>`).join('')}</div>`:'';
   const offers=page.offers.length>1?`<label>${t.offer}</label><div class="offers">${page.offers.map((o,i)=>`<label><span><input type="radio" name="offer" value="${i}"${i===chosen?' checked':''}> ${lpEsc(o.label||o.qty+' '+t.piece)}</span><span class="op">${lpEsc(lpMoney(o.price,page.currency,page.lang))}</span></label>`).join('')}</div>${e('offer')}`:'<input type="hidden" name="offer" value="0">';
   const desc=page.description?`<div class="desc">${page.description.split(/\n+/).map(p=>`<p>${lpEsc(p)}</p>`).join('')}</div>`:'';
-  const scenes=page.scene_images||[],scene=i=>scenes[i]?`<img class="scene" src="/img/${scenes[i]}" alt="${lpEsc(page.product)}" loading="lazy">`:'';
+  const scenes=page.scene_images||[],scene=i=>scenes[i]?`<img class="scene" src="${lpEsc(img(scenes[i]))}" alt="${lpEsc(page.product)}" loading="lazy">`:'';
   const features=(page.features||[]).length?`<section class="pad"><h2>${t.why}</h2><div class="feat">${page.features.map(f=>`<div><span>${lpEsc(f.icon||'⭐')}</span><b>${lpEsc(f.title)}</b><p>${lpEsc(f.text)}</p></div>`).join('')}</div></section>`:'';
   const problem=(page.problems||[]).length?`<section class="pad prob"><h2>${lpEsc(page.problem_title||t.problem)}</h2><ul>${page.problems.map(x=>`<li>${lpEsc(x)}</li>`).join('')}</ul>${page.solution?`<p class="sol">${lpEsc(page.solution)}</p>`:''}</section>`:'';
   const faq=(page.faq||[]).length?`<section class="pad"><h2>${t.faq}</h2>${page.faq.map(f=>`<details><summary>${lpEsc(f.q)}</summary><p>${lpEsc(f.a)}</p></details>`).join('')}</section>`:'';
@@ -133,7 +135,7 @@ export function lpRenderPage(page,{values={},errors={}}={}){
 <div class="badges"><span>💵 ${t.cod}</span><span>🚚 ${t.delivery}</span></div>
 ${page.bullets.length?`<ul class="b">${page.bullets.map(x=>`<li>${lpEsc(x)}</li>`).join('')}</ul>`:''}<a class="cta" href="#order">${lpEsc(page.cta||t.cta)}</a></div>
 ${problem}${scene(0)}${features}${scene(1)}${desc?`<section class="pad">${desc}</section>`:''}${scenes.slice(2).map((_,i)=>scene(i+2)).join('')}${faq}
-<form id="order" method="post" action="/${page.slug}/order" novalidate><h2>${t.form}</h2>${Object.keys(errors).length?`<p class="alert" role="alert">${lpEsc(Object.values(errors)[0])}</p>`:''}
+<form id="order" method="post" action="${lpEsc(base)}/${page.slug}/order" novalidate><h2>${t.form}</h2>${Object.keys(errors).length?`<p class="alert" role="alert">${lpEsc(Object.values(errors)[0])}</p>`:''}
 ${offers}
 <label for="f-name">${t.name}</label><input id="f-name" name="name" autocomplete="name" required maxlength="80" value="${v('name')}">${e('name')}
 <label for="f-phone">${t.phone}</label><input id="f-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="30" dir="ltr" value="${v('phone')}">${e('phone')}
@@ -144,7 +146,7 @@ ${page.ask_address?`<label for="f-address">${t.address}</label><input id="f-addr
 ${page.whatsapp?`<a class="wa" href="https://wa.me/${page.whatsapp}" target="_blank" rel="noopener">${t.wa}</a>`:''}
 <div class="sticky"><a href="#order">${lpEsc(page.cta||t.cta)} · ${lpEsc(lpMoney(page.price,page.currency,page.lang))}</a></div>
 <script>document.getElementById('order').addEventListener('submit',function(){var b=this.querySelector('button');setTimeout(function(){b.disabled=true;b.textContent=${lpJs(t.sending)}},0)})</script>`;
-  return lpShell(page,page.headline||page.product,body);
+  return lpShell(page,page.headline||page.product,body,null,page.images[0]?base+'/img/'+page.images[0]:'');
 }
 
 // The thank-you page. With a stored order it fires the purchase event on the pixels.
