@@ -47,13 +47,14 @@ const LP_COPY_SCHEMA={type:'object',properties:{
   features:{type:'array',items:{type:'object',properties:{icon:{type:'string'},title:{type:'string'},text:{type:'string'}},required:['icon','title','text']}},
   description:{type:'string'},
   faq:{type:'array',items:{type:'object',properties:{q:{type:'string'},a:{type:'string'}},required:['q','a']}},
-  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}}
-},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts','image_captions']};
+  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}},image_subcaptions:{type:'array',items:{type:'string'}}
+},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts','image_captions','image_subcaptions']};
 
-function lpCopyPrompt(lang,product,notes){
+function lpCopyPrompt(lang,product,notes,niche){
+  const hint=Object.hasOwn(LP_NICHES,niche)?LP_NICHES[niche].hint:"";
   return `You are a senior direct-response copywriter who builds high-converting cash-on-delivery landing pages for Morocco and the Gulf.
 Look carefully at the product photos${product?` (the seller calls it: "${product}")`:''}.${notes?`\nSeller notes: ${notes}`:''}
-Write the whole landing page in ${LP_LANG_NAMES[lang]}.
+${hint?`Niche: ${hint}\n`:''}Write the whole landing page in ${LP_LANG_NAMES[lang]}.
 
 Structure it around the customer's PROBLEM (problem → agitate → solution):
 - headline: name the painful everyday problem or the desired result in one punchy line (max 12 words).
@@ -71,7 +72,8 @@ Structure it around the customer's PROBLEM (problem → agitate → solution):
   (1) the product in use, clearly solving the problem; (2) a close-up of quality, materials and details; (3) a happy customer using it in a modern Moroccan home or setting;
   (4) the "before" frustration moment the product removes, with the product nearby; (5) a clean studio hero shot on a soft colored background matching the brand color;
   (6) the product in a second everyday place (work, car, outdoors, travel... whatever fits); (7) hands showing how easy it is to use, step by step; (8) a lifestyle flat-lay of the product with related everyday items.
-- image_captions: exactly 8 captions, one per image_prompt in the same order, written in the page language. Each is 2-5 words, punchy and benefit-first (e.g. "سخونة فـ 30 دقيقة"), no punctuation at the end. They are printed in big bold letters over the photos.
+- image_captions: exactly 8 poster titles, one per image_prompt in the same order, written in the page language. Each is 2-5 words, printed huge and bold above the photo. The first one names the customer's problem or desired result (e.g. "بلا ما تشعل الفران..."), the others are punchy, benefit-first (e.g. "سخونة فـ 30 دقيقة"). No final punctuation except an optional "...".
+- image_subcaptions: exactly 8 short lines (3-7 words), one per title, printed in a colored ribbon under it, completing or explaining the title (e.g. "كيبقى سخون حتى توصل للخدمة").
 
 Rules: short sentences, simple words, no hashtags. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
 }
@@ -88,7 +90,7 @@ async function handleLanding(request,env,user,u){
       const list=await env.BUCKET.list({prefix:mine,limit:100});
       const pages=(await Promise.all(list.objects.map(o=>env.BUCKET.get(o.key).then(r=>r&&r.json())))).filter(Boolean);
       pages.sort((a,b)=>String(b.updated_at).localeCompare(String(a.updated_at)));
-      return json({success:true,shop,ai:!!env.GEMINI_API_KEY&&user===env.VOICE_OWNER_ID,pages});
+      return json({success:true,shop,ai:!!env.GEMINI_API_KEY&&user===env.VOICE_OWNER_ID,pages,niches:Object.entries(LP_NICHES).map(([id,n])=>({id,name:n.name,color:n.c}))});
     }
     if(u.pathname==='/api/landing/save'&&request.method==='POST'){
       const b=await body();if(!b)return json({success:false,error:'INVALID_PAGE'},400);
@@ -142,12 +144,13 @@ async function handleLanding(request,env,user,u){
       const lang=['ar','fr','en'].includes(b.lang)?b.lang:'ar';
       const parts=await lpImageParts(env,user,b.images);if(!parts)return json({success:false,error:'INVALID_IMAGES'},400);
       const product=typeof b.product==='string'?b.product.slice(0,120).replace(/["\n]/g,' '):'',notes=typeof b.notes==='string'?b.notes.slice(0,1000):'';
-      const out=await lpGemini(env,LP_TEXT_MODEL,{contents:[{parts:[...parts,{text:lpCopyPrompt(lang,product,notes)}]}],generationConfig:{thinkingConfig:{thinkingLevel:'low'},responseMimeType:'application/json',maxOutputTokens:6000,responseSchema:LP_COPY_SCHEMA}});
+      const out=await lpGemini(env,LP_TEXT_MODEL,{contents:[{parts:[...parts,{text:lpCopyPrompt(lang,product,notes,b.niche)}]}],generationConfig:{thinkingConfig:{thinkingLevel:'low'},responseMimeType:'application/json',maxOutputTokens:6000,responseSchema:LP_COPY_SCHEMA}});
       let copy;try{copy=JSON.parse(out.map(p=>p.text||'').join(''))}catch{return json({success:false,error:'INVALID_AI_RESPONSE'},502)}
       copy.slug=String(copy.slug||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'product';
       if(copy.slug.length<3)copy.slug+='-shop';
       copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,8);
-      copy.image_captions=(Array.isArray(copy.image_captions)?copy.image_captions:[]).map(String).map(s=>s.trim().slice(0,60)).slice(0,8);
+      const lines=(v,max)=>(Array.isArray(v)?v:[]).map(String).map(s=>s.trim().slice(0,max)).slice(0,8);
+      copy.image_captions=lines(copy.image_captions,60);copy.image_subcaptions=lines(copy.image_subcaptions,80);
       return json({success:true,copy});
     }
     if(u.pathname==='/api/landing/ai-image'&&request.method==='POST'){

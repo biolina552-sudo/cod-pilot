@@ -44,7 +44,8 @@ export default {async fetch(request,env){
     if(!LP_IMAGE_RE.test(m[1])||!['GET','HEAD'].includes(request.method))return notFound();
     const o=await env.BUCKET.get('public-images/'+m[1]);
     if(!o)return notFound();
-    return new Response(request.method==='HEAD'?null:o.body,{headers:{'content-type':o.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=31536000, immutable',...SECURITY}});
+    // CORS lets the app draw these public images on a canvas to export posters.
+    return new Response(request.method==='HEAD'?null:o.body,{headers:{'content-type':o.httpMetadata?.contentType||'image/jpeg','cache-control':'public, max-age=31536000, immutable','access-control-allow-origin':'*',...SECURITY}});
   }
 
   m=path.match(/^\/([a-z0-9-]+)(?:\/(order|thanks))?$/);

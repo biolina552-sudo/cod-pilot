@@ -1,4 +1,4 @@
-<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>صفحات الهبوط | COD Pilot</title><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=1"><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>صفحات الهبوط | COD Pilot</title><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=1"><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
 :root{--g:#196c58;--ink:#243b34;--muted:#6d7a74;--line:#dce4db;--pale:#edf3ef}*{box-sizing:border-box}
 body{font:16px/1.7 'Cairo',system-ui;background:#f5f7f3;color:var(--ink);margin:auto;padding:20px 16px 60px;max-width:1100px}a{color:var(--g)}
 h1{margin:6px 0 4px}h2{margin:0 0 12px;font-size:20px}h3{margin:18px 0 6px;font-size:16px}
@@ -36,6 +36,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
       <label>العملة<select id="wCurrency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
       <label>لغة الصفحة<select id="wLang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
     </div>
+    <label>القالب (النيتش) <span class="hint">(كيبدل الألوان، الأيقونات، والستيل ديال النص والتصاور)</span><select id="wNiche" class="niche"></select></label>
     <label>سمية المنتج <span class="hint">(اختياري)</span><input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
     <label>معلومات زايدة <span class="hint">(اختياري: المشكل اللي كيحل، شكون الزبون...)</span><textarea id="wNotes" maxlength="1000" style="min-height:60px"></textarea></label>
     <label>شحال من تصويرة احترافية يولد الذكاء الاصطناعي؟<select id="wCount"><option value="0">بلا تصاور</option><option value="3">3 تصاور</option><option value="6" selected>6 تصاور</option><option value="8">8 تصاور</option></select></label>
@@ -53,7 +54,9 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     <div class="row">
       <label>الثمن القديم<input id="old_price" type="number" min="0" step="0.01"></label>
       <label>العملة<select id="currency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
+      <label>القالب<select id="niche" class="niche"></select></label>
       <label>اللون<input id="color" type="color" value="#196c58"></label>
+      <label>الشكل<select id="layout"><option value="poster">بوسترات + أزرار "اطلب الآن" بيناتهم</option><option value="classic">كلاسيكي (الكتابة فوق التصويرة)</option></select></label>
     </div>
     <h3>العروض <span class="hint">(الأول هو الثمن الأساسي)</span></h3>
     <div class="rows offers" id="offers"></div><button class="light" id="addOffer">+ عرض</button>
@@ -63,6 +66,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     <label class="picker">+ زيد تصاور<input type="file" id="moreImages" accept="image/*" multiple></label>
     <h3>تصاور احترافية <span class="hint">(بين الأقسام)</span></h3>
     <div class="thumbs" id="scenes"></div>
+    <p><button class="light" id="dlPosters">⬇ تنزيل البوسترات كتصاور PNG (لـ YouCan ولا Shopify)</button></p>
     <div class="row"><label>وصف تصويرة جديدة <span class="hint">(بالإنجليزية ولا بالعربية)</span><input id="scenePrompt" placeholder="the product on a kitchen table, morning light"></label><button id="genScene" style="flex:0">✨ ولد</button></div>
 
     <h3>النص</h3>
@@ -115,7 +119,7 @@ const STATUS={new:'🆕 جديد',confirmed:'✅ مؤكد',shipped:'🚚 مشح�
 const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDEN:'الطلب ممنوع. عاود حمّل الصفحة.',INVALID_SLUG:'الرابط خاصو يكون بحروف لاتينية صغار وأرقام و - (3 حتى 40 حرف).',SLUG_TAKEN:'هاد الرابط مستعمل. بدلو.',INVALID_PRODUCT:'دخل سمية المنتج.',INVALID_PRICE:'دخل الثمن.',INVALID_META_PIXEL:'Facebook Pixel ID خاصو يكون غير أرقام.',INVALID_TIKTOK_PIXEL:'TikTok Pixel ID ماشي صحيح.',INVALID_WHATSAPP:'رقم WhatsApp ماشي صحيح.',IMAGE_TOO_LARGE:'التصويرة كبيرة بزاف.',INVALID_IMAGE:'هاد الملف ماشي تصويرة (JPG/PNG/WEBP).',AI_NOT_CONFIGURED:'الذكاء الاصطناعي ماشي مفعّل (GEMINI_API_KEY و VOICE_OWNER_ID).',GEMINI_AUTH_FAILED:'مفتاح Gemini ماخدامش.',GEMINI_RATE_LIMITED:'Gemini عيا شوية. تسنى دقيقة وعاود.',AI_CONTENT_BLOCKED:'Gemini رفض هاد الطلب. جرب تصاور أخرى.',AI_NO_IMAGE:'Gemini ماعطاش تصويرة. عاود جرب.',AI_MODEL_UNAVAILABLE:'موديل Gemini ماشي متوفر فالحساب ديالك.',AI_TIMEOUT:'Gemini طول بزاف. عاود جرب.',INVALID_AI_RESPONSE:'جواب Gemini ماكانش واضح. عاود جرب.',INVALID_IMAGES:'التصاور ماشي صالحين. عاود زيدهم.'};
 const say=(t,bad)=>{const m=$('msg');m.textContent=t||'';m.classList.toggle('err',!!bad);if(t)m.scrollIntoView({block:'nearest'})};
 const errText=e=>ERR[e]||('وقع مشكل: '+e);
-let shop='',ai=false,pages=[],cur=null,wImages=[];
+let shop='',ai=false,pages=[],cur=null,wImages=[],niches=[];
 
 async function api(path,body,raw){
   const opt=body===undefined?{}:{method:'POST',headers:{'content-type':raw?raw.type:'application/json'},body:raw?raw:JSON.stringify(body)};
@@ -140,7 +144,10 @@ function thumbs(el,ids,opts={}){
     if(i>0)b('→',()=>{ids.splice(i-1,0,ids.splice(i,1)[0]);opts.redraw()},'قدّم');
     if(opts.move)b(opts.move.label,()=>{opts.move.to.push(ids.splice(i,1)[0]);opts.redrawAll()},opts.move.title);
     b('✕',()=>{ids.splice(i,1);opts.redraw()},'حيد');
-    if(opts.captions){const c=document.createElement('input');c.placeholder='كتابة على التصويرة';c.maxLength=60;c.value=opts.captions[id]||'';c.style.cssText='margin-top:4px;padding:4px 6px;font-size:13px;font-weight:700';c.oninput=()=>{opts.captions[id]=c.value};d.append(c)}
+    if(opts.captions){
+      // Poster text: big title + colored ribbon line (old pages stored a plain string).
+      const cap=opts.captions[id]=typeof opts.captions[id]==='string'?{t:opts.captions[id],s:''}:{t:'',s:'',...opts.captions[id]};
+      [['t','العنوان الكبير',60,'800'],['s','السطر الملون',80,'600']].forEach(([k,ph,max,w])=>{const c=document.createElement('input');c.placeholder=ph;c.maxLength=max;c.value=cap[k]||'';c.style.cssText='margin-top:4px;padding:4px 6px;font-size:13px;font-weight:'+w;c.oninput=()=>{cap[k]=c.value};d.append(c)})}
     el.append(d)});
 }
 
@@ -162,18 +169,18 @@ $('wGo').onclick=async()=>{
   const list=['كنحلل التصاور ونكتب النص (المشكل، الحل، المميزات...)',...(count?['كنولد '+count+' تصاور احترافية (كل وحدة كتاخد شي نص دقيقة)']:[]),'الصفحة واجدة للمراجعة'];
   $('wGo').disabled=true;say('');steps(list,0);
   try{
-    const {copy}=await api('/api/landing/ai-copy',{images:wImages,lang,product:$('wProduct').value,notes:$('wNotes').value});
+    const niche=$('wNiche').value,{copy}=await api('/api/landing/ai-copy',{images:wImages,lang,niche,product:$('wProduct').value,notes:$('wNotes').value});
     const scenes=[],caps={};
     if(count){
       // Two at a time: faster, without hitting Gemini's rate limit.
       const prompts=copy.image_prompts.slice(0,count),got=new Array(prompts.length);let next=0,done=0;
       steps(list,1);const li=$('wSteps').children[1],label=li.textContent;
       const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:prompts[i]})).id}catch(x){say('تصويرة '+(i+1)+': '+errText(x.message),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
-      await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);if(copy.image_captions?.[i])caps[id]=copy.image_captions[i]}});
+      await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);caps[id]={t:copy.image_captions?.[i]||'',s:copy.image_subcaptions?.[i]||''}}});
     }
     steps(list,list.length-1);
     const old=parseFloat($('wOld').value);
-    openEditor({...copy,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
+    openEditor({...copy,niche,color:(niches.find(n=>n.id===niche)||{}).color||copy.color,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
     steps(list,list.length);
     say('✔ الصفحة واجدة. راجع النص والتصاور، ومن بعد كليكي "حفظ ونشر".');
   }catch(x){say(errText(x.message),true)}
@@ -195,7 +202,8 @@ function openEditor(p){
   TEXT.forEach(k=>$(k).value=cur[k]??'');
   $('lang').value=cur.lang||'ar';$('currency').value=cur.currency||'MAD';$('color').value=cur.color&&/^#[0-9a-f]{6}$/i.test(cur.color)?cur.color:'#196c58';
   $('old_price').value=cur.old_price??'';$('problems').value=(cur.problems||[]).join('\n');$('bullets').value=(cur.bullets||[]).join('\n');
-  $('ask_address').checked=!!cur.ask_address;$('published').checked=cur.published!==false;
+  $('niche').value=niches.some(n=>n.id===cur.niche)?cur.niche:'general';
+  $('layout').value=cur.layout==='classic'?'classic':'poster';$('ask_address').checked=!!cur.ask_address;$('published').checked=cur.published!==false;
   $('addOffer').onclick=rowList($('offers'),cur.offers,[{k:'qty',p:'الكمية',type:'number'},{k:'price',p:'الثمن',type:'number'},{k:'label',p:'الاسم (مثلا: 2 حبات + توصيل فابور)',max:60}],{qty:2,price:'',label:''});
   $('addFeature').onclick=rowList($('features'),cur.features,[{k:'icon',p:'⭐',max:4},{k:'title',p:'العنوان',max:80},{k:'text',p:'الجملة',max:240}],{icon:'⭐',title:'',text:''});
   $('addFaq').onclick=rowList($('faq'),cur.faq,[{k:'q',p:'السؤال',max:160},{k:'a',p:'الجواب',max:500}],{q:'',a:''});
@@ -213,11 +221,40 @@ $('genScene').onclick=async()=>{
   try{cur.scene_images.push((await api('/api/landing/ai-image',{images:cur.images.slice(0,3),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errText(x.message),true)}
   $('genScene').disabled=false;
 };
+// Posters as PNG files, same style as the page: big dark title, colored ribbon, rounded photo.
+const NICHE_RIBBON={general:['#f2a33a','#fff'],kitchen:['#f39c12','#fff'],health:['#22b8a6','#fff'],beauty:['#f06292','#fff'],home:['#f5b700','#1f1f1f'],kids:['#ff8a3d','#fff'],sport:['#212121','#fff'],tech:['#00a8e8','#fff'],car:['#ff6f00','#fff'],fashion:['#c9a227','#1f1f1f'],pets:['#43a047','#fff']};
+function darker(hex,k=.72){const n=parseInt(hex.slice(1),16);return 'rgb('+[n>>16,n>>8&255,n&255].map(v=>Math.round(v*k)).join(',')+')'}
+async function posterPng(id,cap,color,rtl,niche){
+  await Promise.all([document.fonts.load('900 76px Cairo'),document.fonts.load('800 44px Cairo')]);
+  const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
+  const W=1080,P=40,x=document.createElement('canvas').getContext('2d');
+  const wrap=(text,font,max)=>{x.font=font;const out=[];let line='';for(const w of String(text||'').split(/\s+/).filter(Boolean)){const t=line?line+' '+w:w;if(x.measureText(t).width>max&&line){out.push(line);line=w}else line=t}if(line)out.push(line);return out};
+  const T="900 76px Cairo",S="800 44px Cairo",tl=wrap(cap.t,T,W-2*P),sl=wrap(cap.s,S,W-2*P-80);
+  const top=60+tl.length*100+(sl.length?sl.length*62+50:0),iw=W-2*P,ih=Math.round(im.naturalHeight*iw/im.naturalWidth),c=x.canvas;c.width=W;c.height=top+ih+70;
+  const g=c.getContext('2d'),[rb,rt]=NICHE_RIBBON[niche]||NICHE_RIBBON.general;
+  g.fillStyle='#fff';g.fillRect(0,0,W,c.height);
+  g.globalAlpha=.12;g.fillStyle=color;g.beginPath();g.ellipse(W/2,c.height+60,W*.8,260,0,0,7);g.fill();g.beginPath();g.arc(rtl?40:W-40,30,110,0,7);g.lineWidth=36;g.strokeStyle=color;g.stroke();g.globalAlpha=1;
+  g.textAlign='center';g.textBaseline='middle';g.direction=rtl?'rtl':'ltr';
+  g.fillStyle=darker(color);g.font=T;tl.forEach((l,i)=>g.fillText(l,W/2,60+50+i*100));
+  if(sl.length){g.font=S;const y0=60+tl.length*100+20,bw=Math.max(...sl.map(l=>g.measureText(l).width))+80,bh=sl.length*62+16;
+    g.save();g.translate(W/2,y0+bh/2);g.rotate(-.025);g.fillStyle=rb;g.beginPath();g.roundRect(-bw/2,-bh/2,bw,bh,bh/2);g.fill();g.fillStyle=rt;sl.forEach((l,i)=>g.fillText(l,0,-bh/2+8+31+i*62));g.restore()}
+  g.save();g.beginPath();g.roundRect(P,top,iw,ih,36);g.clip();g.drawImage(im,P,top,iw,ih);g.restore();
+  return await new Promise(r=>c.toBlob(r,'image/png'));
+}
+$('dlPosters').onclick=async()=>{
+  const list=[...(cur.images[0]?[[cur.images[0],{t:$('headline').value||$('product').value,s:$('subheadline').value}]]:[]),...cur.scene_images.map(id=>[id,cur.scene_captions[id]||{}])];
+  if(!list.length)return say('ماكاين حتى تصويرة.',true);
+  $('dlPosters').disabled=true;say('⏳ كنوجد البوسترات...');
+  try{for(let i=0;i<list.length;i++){const blob=await posterPng(list[i][0],list[i][1],$('color').value,$('lang').value==='ar',$('niche').value);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=($('slug').value||'poster')+'-'+(i+1)+'.png';a.click();await new Promise(r=>setTimeout(r,400))}say('✔ تنزلو '+list.length+' بوسترات. حطهم فالصفحة ديالك بنفس الترتيب، وزيد زر "اطلب الآن" بين كل جوج.')}
+  catch(x){say('ماقدرتش نوجد البوسترات: '+(x.message||x),true)}
+  $('dlPosters').disabled=false;
+};
+$('niche').onchange=()=>{const n=niches.find(n=>n.id===$('niche').value);if(n)$('color').value=n.color};
 $('cancel').onclick=()=>{$('editor').hidden=true;cur=null};
 $('save').onclick=async()=>{
   const lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
   const p={...cur};TEXT.forEach(k=>p[k]=$(k).value.trim());
-  Object.assign(p,{lang:$('lang').value,currency:$('currency').value,color:$('color').value,old_price:parseFloat($('old_price').value)||null,problems:lines('problems'),bullets:lines('bullets'),ask_address:$('ask_address').checked,published:$('published').checked,slug:p.slug.toLowerCase()});
+  Object.assign(p,{niche:$('niche').value,layout:$('layout').value,lang:$('lang').value,currency:$('currency').value,color:$('color').value,old_price:parseFloat($('old_price').value)||null,problems:lines('problems'),bullets:lines('bullets'),ask_address:$('ask_address').checked,published:$('published').checked,slug:p.slug.toLowerCase()});
   p.offers=cur.offers.filter(o=>o.price>0);if(!p.offers.length)return say(errText('INVALID_PRICE'),true);
   $('save').disabled=true;say('كنحفظ...');
   try{
@@ -230,7 +267,7 @@ $('save').onclick=async()=>{
 };
 
 async function loadPages(){
-  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages}catch(x){$('pageList').innerHTML='';say(errText(x.message),true);return}
+  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errText(x.message),true);return}
   const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
   if(!shop)say('رابط الصفحات العمومية (SHOP_ORIGIN) ماشي مضبوط، فالروابط مازال مايبانوش.',true);
   for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug,live=p.published&&!!shop;

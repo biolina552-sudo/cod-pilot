@@ -82,7 +82,19 @@ assert.equal((await call('/api/orders/status',{user:'other@test.com',body:{id:or
 const scenePage=(await (await call('/api/landing/save',{body:{...draft,slug:'caption-test',scene_images:[up.id],scene_captions:{[up.id]:'سخونة <b>فـ 30 دقيقة</b>','ffffffffffffffffffffffff.jpg':'x'}}})).json()).page;
 assert.deepEqual(Object.keys(scenePage.scene_captions),[up.id]);
 const capHtml=await (await shopGet('/caption-test')).text();
-assert.ok(capHtml.includes('<figcaption><span>سخونة &lt;b&gt;فـ 30 دقيقة&lt;/b&gt;</span></figcaption>'));
+assert.ok(capHtml.includes('<figure class="poster"><h3>سخونة &lt;b&gt;فـ 30 دقيقة&lt;/b&gt;</h3><img'));
+assert.ok(capHtml.includes('class="top"')&&capHtml.includes('class="offer"'));
+// Title + ribbon line, and niche templates (unknown niche falls back to general).
+const nichePage=(await (await call('/api/landing/save',{body:{...draft,id:scenePage.id,slug:'caption-test',niche:'beauty',color:'',scene_images:[up.id],scene_captions:{[up.id]:{t:'بشرة نقية',s:'فـ 7 أيام <i>'}}}})).json()).page;
+assert.equal(nichePage.niche,'beauty');assert.equal(nichePage.color,'#b0195a');
+const nicheHtml=await (await shopGet('/caption-test')).text();
+assert.ok(nicheHtml.includes('<h3>بشرة نقية</h3><p class="rb">فـ 7 أيام &lt;i&gt;</p>'));
+assert.ok(nicheHtml.includes('--a:#f06292')&&nicheHtml.includes('✨'));
+assert.equal((await (await call('/api/landing/save',{body:{...draft,id:scenePage.id,slug:'caption-test',niche:'__proto__'}})).json()).page.niche,'general');
+const listed=await (await call('/api/landing')).json();assert.ok(listed.niches.some(n=>n.id==='kitchen'&&n.color));
+await call('/api/landing/save',{body:{...draft,id:scenePage.id,slug:'caption-test',layout:'classic',scene_images:[up.id],scene_captions:{[up.id]:'سخونة'}}});
+assert.ok((await (await shopGet('/caption-test')).text()).includes('<figcaption><span>سخونة</span></figcaption>'));
+assert.equal((await shopGet('/img/'+up.id)).headers.get('access-control-allow-origin'),'*');
 await call('/api/landing/delete',{body:{id:scenePage.id}});
 
 // Download for other sites: images inline, form posts to the shop, Cairo font.
@@ -129,4 +141,4 @@ globalThis.fetch=realFetch;
 const html=readFileSync('pages.html','utf8');new Function(html.match(/<script>([\s\S]*)<\/script>/)[1]);
 assert.equal((await call('/pages')).status,200);
 
-console.log('PASS landing pages: auth/CSRF, image sniffing, validation, slug ownership, escaping, pixels, COD orders, honeypot, HTML export, photo captions, isolation, status, publish/rename/delete, Gemini copy+image, editor syntax');
+console.log('PASS landing pages: auth/CSRF, image sniffing, validation, slug ownership, escaping, pixels, COD orders, honeypot, HTML export, photo captions, niche templates, isolation, status, publish/rename/delete, Gemini copy+image, editor syntax');
