@@ -2,7 +2,7 @@
 // Public pages are served by the separate shop worker (shop/entry.js).
 const LP_IMAGE_TYPES={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
 const LP_IMAGE_LIMIT=5*1024*1024;
-const LP_TEXT_MODELS=['gemini-3.6-flash','gemini-3.5-flash','gemini-2.5-flash'],LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-3.1-flash-image-preview','gemini-2.5-flash-image','gemini-nano-banana-2.1'];
+const LP_TEXT_MODELS=['gemini-3.6-flash','gemini-3.8-flash','gemini-2.5-flash'],LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-3.1-flash-image-preview','gemini-2.5-flash-image','gemini-nano-banana-2.1'];
 const lpHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 function lpB64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(s)}
 function lpSniff(b){
@@ -32,10 +32,11 @@ async function lpGeminiRetry(env,model,body){
   for(let i=0;;i++){try{return await lpGemini(env,model,body)}catch(e){if(e.code!=='AI_BUSY'||i>=2)throw e;await new Promise(r=>setTimeout(r,2000*(i+1)))}}
 }
 // Tries each model (and each request variant) in turn; errors about the key, quota or content stop at once.
-async function lpGeminiFirst(env,models,variants){
+// usable(parts) can reject an answer that came back empty (e.g. no image) so the next try runs.
+async function lpGeminiFirst(env,models,variants,usable=()=>true){
   let last;
   for(const model of models)for(const body of variants(model)){
-    try{return await lpGeminiRetry(env,model,body)}
+    try{const out=await lpGeminiRetry(env,model,body);if(usable(out))return out;last=Object.assign(Error('empty'),{code:'AI_NO_IMAGE',detail:model+': no image in the answer'})}
     catch(e){last=e;if(!['AI_MODEL_UNAVAILABLE','AI_BUSY','GENERATION_FAILED'].includes(e.code))throw e}
   }
   throw last;
@@ -198,7 +199,7 @@ Style: high-end advertising photography, natural soft light, sharp focus on the 
       const req={contents:[{parts:[...parts,{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],imageConfig:{aspectRatio:b.aspect==='4:5'?'4:5':'1:1'}}};
       // Image model names change often: fall back to the next one if a model is gone.
       // Some image models want TEXT+IMAGE output and no imageConfig: try that shape too.
-      const out=await lpGeminiFirst(env,await lpImageModels(env),()=>[req,{contents:req.contents,generationConfig:{responseModalities:['TEXT','IMAGE']}}]);
+      const out=await lpGeminiFirst(env,await lpImageModels(env),()=>[req,{contents:req.contents,generationConfig:{responseModalities:['TEXT','IMAGE']}}],parts=>parts.some(p=>(p.inlineData||p.inline_data)?.data));
       const img=out.map(p=>p.inlineData||p.inline_data).find(d=>d?.data);
       if(!img)return json({success:false,error:'AI_NO_IMAGE'},502);
       const bytes=Uint8Array.from(atob(img.data),c=>c.charCodeAt(0)),type=lpSniff(bytes);

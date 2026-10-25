@@ -185,14 +185,16 @@ $('wGo').onclick=async()=>{
       // No AI photos (none asked, or Gemini failed): build designed posters from code instead.
       say('⏳ كنصاوب بوسترات مصممة من التصاور ديالك...');
       const nc=(niches.find(n=>n.id===niche)||{}).color||copy.color||'#196c58';
-      scenes.push(...await codePosters(copy,wImages,/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58',lang==='ar',niche));
+      scenes.push(...await codePosters(copy,wImages,/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58',lang,niche));
     }
     steps(list,list.length-1);
     const old=parseFloat($('wOld').value);
     openEditor({...copy,niche,color:(niches.find(n=>n.id===niche)||{}).color||copy.color,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
     steps(list,list.length);
     // Keep image errors visible: otherwise the success message hides why photos are missing.
-    if(count&&!aiPhotos)say('⚠️ تصاور Gemini ماتولداتش ('+[...imgErrs].join(' / ')+'). عوضتهم بـ '+scenes.length+' بوسترات مصممة من التصاور ديالك. راجع الصفحة ومن بعد كليكي "حفظ ونشر".',true);
+    const why=count&&!aiPhotos?'⚠️ تصاور Gemini ماتولداتش'+(imgErrs.size?' ('+[...imgErrs].join(' / ')+')':'')+'. ':'';
+    if(!scenes.length)say(why+'⚠️ ماقدرتش نصاوب حتى بوستر من التصاور ديالك. النص واجد: زيد تصاور ولا عاود جرب، ومن بعد "حفظ ونشر".',true);
+    else if(why)say(why+'عوضتهم بـ '+scenes.length+' بوسترات مصممة من التصاور ديالك. راجع الصفحة ومن بعد كليكي "حفظ ونشر".',true);
     else say('✔ الصفحة واجدة'+(imgErrs.size?' (شي تصاور ماتولداتش: '+[...imgErrs].join(' / ')+')':'')+'. راجع النص والتصاور، ومن بعد كليكي "حفظ ونشر".');
   }catch(x){say(errOf(x),true)}
   $('wGo').disabled=false;
@@ -273,13 +275,14 @@ async function listPng(id,title,rows,color,rtl){
   return await new Promise(r=>c.toBlob(r,'image/jpeg',.9));
 }
 // Without AI photos, the wizard still fills the page with posters built from the seller's own photos.
-async function codePosters(copy,photos,color,rtl,niche){
+async function codePosters(copy,photos,color,lang,niche){
+  const rtl=lang==='ar';
   const caps=copy.image_captions||[],subs=copy.image_subcaptions||[],at=i=>photos[i%photos.length],out=[];
   const jobs=[
     ()=>posterPng(at(0),{t:caps[0]||copy.headline,s:subs[0]||copy.subheadline},color,rtl,niche,'image/jpeg'),
     ()=>(copy.problems||[]).length&&listPng(at(1),copy.problem_title||copy.headline,[...copy.problems.slice(0,4).map(p=>['❌',p]),...(copy.solution?[['✅',copy.solution]]:[])],color,rtl),
     ()=>posterPng(at(2),{t:caps[1]||copy.bullets?.[0]||'',s:subs[1]||''},color,rtl,niche,'image/jpeg'),
-    ()=>(copy.features||[]).length&&listPng(at(3),rtl?'علاش غادي يعجبك؟':'Why you will love it',copy.features.slice(0,4).map(f=>[f.icon||'⭐',f.title+(f.text?': '+f.text:'')]),color,rtl),
+    ()=>(copy.features||[]).length&&listPng(at(3),{ar:'علاش غادي يعجبك؟',fr:'Pourquoi vous allez l’adorer',en:'Why you will love it'}[lang]||'Why you will love it',copy.features.slice(0,4).map(f=>[f.icon||'⭐',f.title+(f.text?': '+f.text:'')]),color,rtl),
     ()=>posterPng(at(4),{t:caps[2]||copy.bullets?.[1]||'',s:subs[2]||''},color,rtl,niche,'image/jpeg')
   ];
   for(const job of jobs){try{const blob=await job();if(blob)out.push((await api('/api/landing/image',null,blob)).id)}catch(x){console.warn('poster',x)}}
