@@ -137,6 +137,12 @@ assert.match(gen.id,/\.png$/);assert.deepEqual(calls[1].body.generationConfig.re
 assert.ok(calls[1].url.includes('/gemini-9-flash-image-preview:'));
 {const keep=globalThis.fetch;globalThis.fetch=async(url,opt)=>String(url).includes('/models?')?keep(url,opt):new Response('{"error":{"message":"Quota exceeded, limit: 0, model: x free_tier"}}',{status:429});
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.equal((await r.json()).error,'AI_IMAGE_NEEDS_BILLING');globalThis.fetch=keep}
+// A model that fails with a plain 400 is skipped for the next one; the reason reaches the owner.
+{const keep=globalThis.fetch,seen=[];globalThis.fetch=async(url,opt)=>{seen.push(String(url));return String(url).includes('gemini-3.6-flash:')?new Response('{"error":{"message":"Invalid value at thinking_level"}}',{status:400}):keep(url,opt)};
+r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});assert.equal(r.status,200);assert.ok(seen.some(u=>u.includes('gemini-3.5-flash:')));
+globalThis.fetch=async()=>new Response('{"error":{"message":"bad request x"}}',{status:400});
+const fail=await (await call('/api/landing/ai-copy',{body:{images:[up.id]}})).json();assert.equal(fail.error,'GENERATION_FAILED');assert.match(fail.detail,/400: .*bad request x/);
+globalThis.fetch=keep}
 globalThis.fetch=async()=>new Response('{"error":{"message":"API_KEY_INVALID test-gemini-key"}}',{status:400});
 r=await call('/api/landing/ai-copy',{body:{images:[up.id]}});assert.equal((await r.json()).error,'GEMINI_AUTH_FAILED');
 globalThis.fetch=async()=>{throw new DOMException('timed out','TimeoutError')};
