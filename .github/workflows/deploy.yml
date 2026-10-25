@@ -42,7 +42,10 @@ jobs:
       - run: npm ci
       - name: Deploy to Cloudflare Workers
         if: env.CLOUDFLARE_API_TOKEN != ''
-        run: npx wrangler deploy
+        # The account ID is optional when the token can read memberships.
+        run: |
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || unset CLOUDFLARE_ACCOUNT_ID
+          npx wrangler deploy
       - name: Skip deploy
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: echo "CLOUDFLARE_API_TOKEN is not set; see CLOUDFLARE-SETUP.md"
