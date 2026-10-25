@@ -32,6 +32,13 @@ ChatGPT Sites sign-in with Cloudflare Access: only emails you allow can open the
 `GEMINI_API_KEY` and `VOICE_OWNER_ID` can also be added as GitHub repository secrets
 (Settings > Secrets and variables > Actions); each deploy copies them to Cloudflare.
 
+## Landing pages
+
+Landing pages are served by a second, public worker, `cod-pilot-shop` (`shop/`), deployed by
+the same GitHub Action. It shares the R2 bucket and can only read published pages and images
+and add orders. Keep Cloudflare Access off for it, since customers must open it without signing in.
+Pages are made at `/pages` in the app; `SHOP_ORIGIN` in `wrangler.toml` is its address.
+
 For Facebook, add `https://<your workers.dev address>/api/meta/callback` to the Meta app's
 Valid OAuth Redirect URIs.
 

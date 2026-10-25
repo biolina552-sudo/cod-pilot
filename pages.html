@@ -1,0 +1,275 @@
+<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>صفحات الهبوط | COD Pilot</title><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=1"><style>@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+:root{--g:#196c58;--ink:#243b34;--muted:#6d7a74;--line:#dce4db;--pale:#edf3ef}*{box-sizing:border-box}
+body{font:16px/1.7 'Cairo',system-ui;background:#f5f7f3;color:var(--ink);margin:auto;padding:20px 16px 60px;max-width:1100px}a{color:var(--g)}
+h1{margin:6px 0 4px}h2{margin:0 0 12px;font-size:20px}h3{margin:18px 0 6px;font-size:16px}
+section,.card{background:#fff;padding:20px;border:1px solid var(--line);border-radius:16px;margin:16px 0}
+label{display:block;margin:10px 0 0;font-weight:600;font-size:14px}input,textarea,select{font:inherit;padding:9px 11px;width:100%;border:1px solid #cfd8d1;border-radius:9px;background:#fff;margin-top:4px}textarea{min-height:90px}
+input[type=checkbox],input[type=radio]{width:auto;margin:0 0 0 6px}input[type=color]{height:44px;padding:3px}
+button,.btn{font:inherit;font-weight:700;background:var(--g);color:#fff;border:0;border-radius:9px;padding:10px 16px;cursor:pointer;text-decoration:none;display:inline-block}button:disabled{opacity:.5;cursor:wait}
+button.light,.btn.light{background:var(--pale);color:var(--ink)}button.danger{background:#fdecea;color:#b42318}button.big{font-size:19px;padding:14px 22px;width:100%}
+.tabs{display:flex;gap:8px;margin:14px 0}.tabs button{background:#fff;color:var(--ink);border:1px solid var(--line)}.tabs button[aria-selected=true]{background:var(--g);color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.row>*{flex:1;min-width:120px}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}.pc{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff}.pc img{width:100%;aspect-ratio:1;object-fit:cover;background:var(--pale);display:block}.pc div{padding:12px}.pc p{margin:2px 0;color:var(--muted);font-size:14px;overflow-wrap:anywhere}.pc .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.pc .acts>*{padding:7px 11px;font-size:14px}
+.badge{display:inline-block;border-radius:999px;padding:1px 10px;font-size:12px;font-weight:700;background:var(--pale)}.badge.on{background:#d9f2e3;color:#106b3b}
+.thumbs{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}.thumb{position:relative;width:112px}.thumb img{width:112px;height:112px;object-fit:cover;border-radius:10px;border:1px solid var(--line);display:block}.thumb .tb{display:flex;gap:3px;margin-top:3px}.thumb .tb button{padding:2px 6px;font-size:12px;flex:1}
+.picker{display:inline-block;background:var(--g);color:#fff;padding:10px 16px;border-radius:9px;cursor:pointer;font-weight:700}.picker input{position:absolute;width:1px;height:1px;opacity:0}.picker:focus-within{outline:3px solid #9ccdbb}
+.status{white-space:pre-wrap;background:var(--pale);border-radius:10px;padding:10px 14px;margin:12px 0}.status:empty{display:none}.err{background:#fdecea;color:#b42318}
+.steps li{margin:4px 0}.steps li.done{color:#106b3b}.steps li.now{font-weight:700}
+.rows>div{display:grid;gap:8px;grid-template-columns:60px 1fr 2fr 36px;margin:6px 0}.rows.faq>div{grid-template-columns:1fr 2fr 36px}.rows.offers>div{grid-template-columns:90px 1fr 2fr 36px}.rows input{margin:0}.rows button{padding:6px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;border-bottom:1px solid #eef1ee;text-align:start;vertical-align:top}th{color:var(--muted);font-weight:600}td select{padding:4px 6px;margin:0;width:auto}.tw{overflow-x:auto}
+.sum{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.sum span{background:var(--pale);border-radius:10px;padding:6px 12px;font-size:14px}
+.hint{color:var(--muted);font-size:13px;font-weight:400}.link{direction:ltr;text-align:left;background:var(--pale);padding:8px 12px;border-radius:9px;overflow-wrap:anywhere}
+@media(max-width:640px){.rows>div,.rows.offers>div{grid-template-columns:1fr 1fr}.rows.faq>div{grid-template-columns:1fr}}
+</style>
+<a href="/">← COD Pilot</a><h1>صفحات الهبوط والطلبات</h1><p class="hint">عطي التصاور، والذكاء الاصطناعي كيكتب الصفحة ويصاوب تصاور احترافية. الزبون كيطلب بالدفع عند الاستلام، والطلبات كتوصلك هنا.</p>
+<div class="tabs" role="tablist"><button role="tab" id="tabPages" aria-selected="true">صفحاتي</button><button role="tab" id="tabOrders" aria-selected="false">الطلبات <span id="newCount"></span></button></div>
+<div id="msg" class="status" role="status"></div>
+
+<div id="viewPages">
+  <section id="wizard">
+    <h2>✨ صفحة جديدة بالذكاء الاصطناعي</h2>
+    <label class="picker">📷 زيد تصاور المنتج (1 حتى 4)<input type="file" id="wFiles" accept="image/*" multiple></label>
+    <div class="thumbs" id="wThumbs"></div>
+    <div class="row">
+      <label>الثمن<input id="wPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="199"></label>
+      <label>الثمن القديم <span class="hint">(اختياري)</span><input id="wOld" type="number" min="0" step="0.01" inputmode="decimal" placeholder="299"></label>
+      <label>العملة<select id="wCurrency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
+      <label>لغة الصفحة<select id="wLang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
+    </div>
+    <label>سمية المنتج <span class="hint">(اختياري)</span><input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
+    <label>معلومات زايدة <span class="hint">(اختياري: المشكل اللي كيحل، شكون الزبون...)</span><textarea id="wNotes" maxlength="1000" style="min-height:60px"></textarea></label>
+    <label><input type="checkbox" id="wImages" checked> ولد 3 تصاور احترافية بالذكاء الاصطناعي</label>
+    <p><button class="big" id="wGo">✨ صاوب الصفحة</button></p>
+    <ol class="steps" id="wSteps" hidden></ol>
+  </section>
+
+  <section id="editor" hidden>
+    <h2 id="edTitle">تعديل الصفحة</h2>
+    <div class="row">
+      <label>سمية المنتج<input id="product" maxlength="120"></label>
+      <label>الرابط <span class="hint">(حروف لاتينية صغار و -)</span><input id="slug" maxlength="40" dir="ltr"></label>
+      <label>اللغة<select id="lang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
+    </div>
+    <div class="row">
+      <label>الثمن القديم<input id="old_price" type="number" min="0" step="0.01"></label>
+      <label>العملة<select id="currency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
+      <label>اللون<input id="color" type="color" value="#196c58"></label>
+    </div>
+    <h3>العروض <span class="hint">(الأول هو الثمن الأساسي)</span></h3>
+    <div class="rows offers" id="offers"></div><button class="light" id="addOffer">+ عرض</button>
+
+    <h3>تصاور المنتج <span class="hint">(فوق فالصفحة)</span></h3>
+    <div class="thumbs" id="images"></div>
+    <label class="picker">+ زيد تصاور<input type="file" id="moreImages" accept="image/*" multiple></label>
+    <h3>تصاور احترافية <span class="hint">(بين الأقسام)</span></h3>
+    <div class="thumbs" id="scenes"></div>
+    <div class="row"><label>وصف تصويرة جديدة <span class="hint">(بالإنجليزية ولا بالعربية)</span><input id="scenePrompt" placeholder="the product on a kitchen table, morning light"></label><button id="genScene" style="flex:0">✨ ولد</button></div>
+
+    <h3>النص</h3>
+    <label>العنوان الكبير<input id="headline" maxlength="160"></label>
+    <label>الجملة تحت العنوان<input id="subheadline" maxlength="300"></label>
+    <label>عنوان قسم المشكل<input id="problem_title" maxlength="160"></label>
+    <label>المشاكل <span class="hint">(كل سطر مشكل)</span><textarea id="problems"></textarea></label>
+    <label>الحل<textarea id="solution" maxlength="500" style="min-height:60px"></textarea></label>
+    <label>المميزات <span class="hint">(كل سطر ميزة)</span><textarea id="bullets"></textarea></label>
+    <h3>علاش تختارو <span class="hint">(إيموجي · عنوان · جملة)</span></h3>
+    <div class="rows" id="features"></div><button class="light" id="addFeature">+ زيد</button>
+    <label>الوصف<textarea id="description" maxlength="3000"></textarea></label>
+    <h3>أسئلة متكررة</h3>
+    <div class="rows faq" id="faq"></div><button class="light" id="addFaq">+ سؤال</button>
+    <label>نص زر الطلب<input id="cta" maxlength="40"></label>
+
+    <h3>الطلب والتتبع</h3>
+    <label><input type="checkbox" id="ask_address"> طلب العنوان الكامل من الزبون</label>
+    <div class="row">
+      <label>رقم WhatsApp <span class="hint">(اختياري، مثلا 2126...)</span><input id="whatsapp" dir="ltr" inputmode="tel"></label>
+      <label>Facebook Pixel ID<input id="meta_pixel" dir="ltr" inputmode="numeric"></label>
+      <label>TikTok Pixel ID<input id="tiktok_pixel" dir="ltr"></label>
+    </div>
+    <label>رسالة الشكر <span class="hint">(اختياري)</span><input id="thanks" maxlength="300"></label>
+    <label><input type="checkbox" id="published" checked> منشورة (الناس يقدرو يشوفوها)</label>
+    <p class="row"><button class="big" id="save">💾 حفظ ونشر</button><button class="light" id="cancel" style="flex:0">إلغاء</button></p>
+    <div id="savedLink"></div>
+  </section>
+
+  <section><h2>صفحاتي</h2><div class="pages" id="pageList"><p class="hint">كنحمّل...</p></div></section>
+</div>
+
+<div id="viewOrders" hidden>
+  <section>
+    <div class="row">
+      <label>الحالة<select id="fStatus"><option value="">الكل</option></select></label>
+      <label>الصفحة<select id="fPage"><option value="">الكل</option></select></label>
+      <button class="light" id="refresh" style="flex:0">↻ تحديث</button>
+      <button class="light" id="csv" style="flex:0">⬇ Excel (CSV)</button>
+    </div>
+    <div class="sum" id="summary"></div>
+    <div class="tw"><table><thead><tr><th>التاريخ</th><th>المنتج</th><th>العرض</th><th>الزبون</th><th>الهاتف</th><th>المدينة / العنوان</th><th>الحالة</th></tr></thead><tbody id="orderRows"></tbody></table></div>
+    <p id="moreWrap" hidden><button class="light" id="more">عرض المزيد</button></p>
+  </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const STATUS={new:'🆕 جديد',confirmed:'✅ مؤكد',shipped:'🚚 مشحون',delivered:'📦 توصل',cancelled:'❌ ملغي',returned:'↩️ رجع'};
+const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDEN:'الطلب ممنوع. عاود حمّل الصفحة.',INVALID_SLUG:'الرابط خاصو يكون بحروف لاتينية صغار وأرقام و - (3 حتى 40 حرف).',SLUG_TAKEN:'هاد الرابط مستعمل. بدلو.',INVALID_PRODUCT:'دخل سمية المنتج.',INVALID_PRICE:'دخل الثمن.',INVALID_META_PIXEL:'Facebook Pixel ID خاصو يكون غير أرقام.',INVALID_TIKTOK_PIXEL:'TikTok Pixel ID ماشي صحيح.',INVALID_WHATSAPP:'رقم WhatsApp ماشي صحيح.',IMAGE_TOO_LARGE:'التصويرة كبيرة بزاف.',INVALID_IMAGE:'هاد الملف ماشي تصويرة (JPG/PNG/WEBP).',AI_NOT_CONFIGURED:'الذكاء الاصطناعي ماشي مفعّل (GEMINI_API_KEY و VOICE_OWNER_ID).',GEMINI_AUTH_FAILED:'مفتاح Gemini ماخدامش.',GEMINI_RATE_LIMITED:'Gemini عيا شوية. تسنى دقيقة وعاود.',AI_CONTENT_BLOCKED:'Gemini رفض هاد الطلب. جرب تصاور أخرى.',AI_NO_IMAGE:'Gemini ماعطاش تصويرة. عاود جرب.',AI_MODEL_UNAVAILABLE:'موديل Gemini ماشي متوفر فالحساب ديالك.',AI_TIMEOUT:'Gemini طول بزاف. عاود جرب.',INVALID_AI_RESPONSE:'جواب Gemini ماكانش واضح. عاود جرب.',INVALID_IMAGES:'التصاور ماشي صالحين. عاود زيدهم.'};
+const say=(t,bad)=>{const m=$('msg');m.textContent=t||'';m.classList.toggle('err',!!bad);if(t)m.scrollIntoView({block:'nearest'})};
+const errText=e=>ERR[e]||('وقع مشكل: '+e);
+let shop='',ai=false,pages=[],cur=null,wImages=[];
+
+async function api(path,body,raw){
+  const opt=body===undefined?{}:{method:'POST',headers:{'content-type':raw?raw.type:'application/json'},body:raw?raw:JSON.stringify(body)};
+  let r,d;try{r=await fetch(path,opt);d=await r.json()}catch{throw Error('NETWORK')}
+  if(!r.ok||d.success===false)throw Error(d.error||'HTTP_'+r.status);return d;
+}
+const img=id=>shop?shop+'/img/'+id:'';
+
+// Phone photos are big: shrink to 1600px JPEG before upload.
+async function shrink(file){
+  const bmp=await createImageBitmap(file).catch(()=>null);if(!bmp)throw Error('INVALID_IMAGE');
+  const s=Math.min(1,1600/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);
+  const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(bmp,0,0,c.width,c.height);
+  return await new Promise(res=>c.toBlob(res,'image/jpeg',.88));
+}
+async function upload(files){const ids=[];for(const f of files){const blob=await shrink(f);ids.push((await api('/api/landing/image',null,blob)).id)}return ids}
+
+function thumbs(el,ids,opts={}){
+  el.innerHTML='';
+  ids.forEach((id,i)=>{const d=document.createElement('div');d.className='thumb';d.innerHTML=`<img alt=""><div class="tb"></div>`;d.querySelector('img').src=img(id);const tb=d.querySelector('.tb');
+    const b=(t,f,title)=>{const x=document.createElement('button');x.className='light';x.textContent=t;x.title=title;x.onclick=f;tb.append(x)};
+    if(i>0)b('→',()=>{ids.splice(i-1,0,ids.splice(i,1)[0]);opts.redraw()},'قدّم');
+    if(opts.move)b(opts.move.label,()=>{opts.move.to.push(ids.splice(i,1)[0]);opts.redrawAll()},opts.move.title);
+    b('✕',()=>{ids.splice(i,1);opts.redraw()},'حيد');
+    el.append(d)});
+}
+
+// ---------- AI wizard ----------
+$('wFiles').onchange=async e=>{
+  const files=[...e.target.files].slice(0,4-wImages.length);e.target.value='';if(!files.length)return;
+  say('كنرفع التصاور...');try{wImages.push(...await upload(files));say('')}catch(x){say(errText(x.message),true)}
+  drawW();
+};
+function drawW(){thumbs($('wThumbs'),wImages,{redraw:drawW})}
+function steps(list,at){const ol=$('wSteps');ol.hidden=false;ol.innerHTML=list.map((s,i)=>`<li class="${i<at?'done':i===at?'now':''}">${i<at?'✔ ':i===at?'⏳ ':''}${s}</li>`).join('')}
+function suggestOffers(p){const two=Math.max(p,Math.round(p*1.8/10)*10-1);return [{qty:1,price:p,label:''},{qty:2,price:two,label:''}]}
+$('wGo').onclick=async()=>{
+  const price=parseFloat($('wPrice').value);
+  if(!wImages.length)return say('زيد على الأقل تصويرة وحدة ديال المنتج.',true);
+  if(!(price>0))return say('دخل الثمن.',true);
+  if(!ai)return say(errText('AI_NOT_CONFIGURED'),true);
+  const lang=$('wLang').value,gen=$('wImages').checked;
+  const list=['كنحلل التصاور ونكتب النص (المشكل، الحل، المميزات...)',...(gen?['كنولد تصويرة احترافية 1','كنولد تصويرة احترافية 2','كنولد تصويرة احترافية 3']:[]),'الصفحة واجدة للمراجعة'];
+  $('wGo').disabled=true;say('');steps(list,0);
+  try{
+    const {copy}=await api('/api/landing/ai-copy',{images:wImages,lang,product:$('wProduct').value,notes:$('wNotes').value});
+    const scenes=[];
+    if(gen)for(let i=0;i<copy.image_prompts.length&&i<3;i++){steps(list,i+1);try{scenes.push((await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:copy.image_prompts[i]})).id)}catch(x){say('تصويرة '+(i+1)+': '+errText(x.message),true)}}
+    steps(list,list.length-1);
+    const old=parseFloat($('wOld').value);
+    openEditor({...copy,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,published:true,ask_address:false,_prompts:copy.image_prompts});
+    steps(list,list.length);
+    say('✔ الصفحة واجدة. راجع النص والتصاور، ومن بعد كليكي "حفظ ونشر".');
+  }catch(x){say(errText(x.message),true)}
+  $('wGo').disabled=false;
+};
+
+// ---------- editor ----------
+function rowList(el,items,fields,blank){
+  const draw=()=>{el.innerHTML='';items.forEach((it,i)=>{const d=document.createElement('div');
+    fields.forEach(f=>{const x=document.createElement('input');x.value=it[f.k]??'';x.placeholder=f.p;if(f.type)x.type=f.type;if(f.max)x.maxLength=f.max;x.oninput=()=>it[f.k]=f.type==='number'?parseFloat(x.value):x.value;d.append(x)});
+    const rm=document.createElement('button');rm.className='danger';rm.textContent='✕';rm.title='حيد';rm.onclick=()=>{items.splice(i,1);draw()};d.append(rm);el.append(d)})};
+  draw();return ()=>{items.push({...blank});draw()};
+}
+const TEXT=['product','slug','headline','subheadline','problem_title','solution','description','cta','whatsapp','meta_pixel','tiktok_pixel','thanks'];
+function openEditor(p){
+  cur={features:[],faq:[],offers:[{qty:1,price:0,label:''}],images:[],scene_images:[],...structuredClone(p)};
+  cur.features=cur.features||[];cur.faq=cur.faq||[];
+  $('edTitle').textContent=cur.id?'تعديل: '+cur.product:'صفحة جديدة';
+  TEXT.forEach(k=>$(k).value=cur[k]??'');
+  $('lang').value=cur.lang||'ar';$('currency').value=cur.currency||'MAD';$('color').value=cur.color&&/^#[0-9a-f]{6}$/i.test(cur.color)?cur.color:'#196c58';
+  $('old_price').value=cur.old_price??'';$('problems').value=(cur.problems||[]).join('\n');$('bullets').value=(cur.bullets||[]).join('\n');
+  $('ask_address').checked=!!cur.ask_address;$('published').checked=cur.published!==false;
+  $('addOffer').onclick=rowList($('offers'),cur.offers,[{k:'qty',p:'الكمية',type:'number'},{k:'price',p:'الثمن',type:'number'},{k:'label',p:'الاسم (مثلا: 2 حبات + توصيل فابور)',max:60}],{qty:2,price:'',label:''});
+  $('addFeature').onclick=rowList($('features'),cur.features,[{k:'icon',p:'⭐',max:4},{k:'title',p:'العنوان',max:80},{k:'text',p:'الجملة',max:240}],{icon:'⭐',title:'',text:''});
+  $('addFaq').onclick=rowList($('faq'),cur.faq,[{k:'q',p:'السؤال',max:160},{k:'a',p:'الجواب',max:500}],{q:'',a:''});
+  drawImages();$('savedLink').innerHTML='';$('editor').hidden=false;$('editor').scrollIntoView({behavior:'smooth'});
+}
+function drawImages(){
+  thumbs($('images'),cur.images,{redraw:drawImages,redrawAll:drawImages,move:{label:'↓',title:'رد لتحت',to:cur.scene_images}});
+  thumbs($('scenes'),cur.scene_images,{redraw:drawImages,redrawAll:drawImages,move:{label:'↑',title:'طلع للفوق',to:cur.images}});
+}
+$('moreImages').onchange=async e=>{const files=[...e.target.files];e.target.value='';say('كنرفع التصاور...');try{cur.images.push(...await upload(files));say('')}catch(x){say(errText(x.message),true)}drawImages()};
+$('genScene').onclick=async()=>{
+  const prompt=$('scenePrompt').value.trim()||cur._prompts?.[cur.scene_images.length%3]||'the product in use in a bright modern Moroccan home';
+  if(!cur.images.length)return say('زيد تصويرة ديال المنتج الأول.',true);
+  $('genScene').disabled=true;say('⏳ كنولد التصويرة... (حتى دقيقة)');
+  try{cur.scene_images.push((await api('/api/landing/ai-image',{images:cur.images.slice(0,3),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errText(x.message),true)}
+  $('genScene').disabled=false;
+};
+$('cancel').onclick=()=>{$('editor').hidden=true;cur=null};
+$('save').onclick=async()=>{
+  const lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
+  const p={...cur};TEXT.forEach(k=>p[k]=$(k).value.trim());
+  Object.assign(p,{lang:$('lang').value,currency:$('currency').value,color:$('color').value,old_price:parseFloat($('old_price').value)||null,problems:lines('problems'),bullets:lines('bullets'),ask_address:$('ask_address').checked,published:$('published').checked,slug:p.slug.toLowerCase()});
+  p.offers=cur.offers.filter(o=>o.price>0);if(!p.offers.length)return say(errText('INVALID_PRICE'),true);
+  $('save').disabled=true;say('كنحفظ...');
+  try{
+    const d=await api('/api/landing/save',p);cur={...d.page,_prompts:cur._prompts};
+    $('savedLink').innerHTML=d.url&&d.page.published?`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button></p>`:'<p>✔ تحفظات (ماشي منشورة).</p>';
+    if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
+    say('✔ تحفظات.');wImages=[];drawW();$('wSteps').hidden=true;await loadPages();
+  }catch(x){say(errText(x.message),true)}
+  $('save').disabled=false;
+};
+
+async function loadPages(){
+  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages}catch(x){$('pageList').innerHTML='';say(errText(x.message),true);return}
+  const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
+  for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug;
+    d.innerHTML=`<img alt=""><div><b></b> <span class="badge ${p.published?'on':''}">${p.published?'منشورة':'مخبية'}</span><p class="u" dir="ltr"></p><div class="acts"><button class="e">تعديل</button>${p.published?'<a class="btn light o" target="_blank" rel="noopener">فتح</a><button class="light c">نسخ الرابط</button>':''}<button class="danger x">حذف</button></div></div>`;
+    if(p.images[0]||p.scene_images?.[0])d.querySelector('img').src=img(p.images[0]||p.scene_images[0]);
+    d.querySelector('b').textContent=p.product;d.querySelector('.u').textContent='/'+p.slug;
+    d.querySelector('.e').onclick=()=>openEditor(p);
+    if(p.published){d.querySelector('.o').href=url;d.querySelector('.c').onclick=()=>navigator.clipboard.writeText(url).then(()=>say('✔ تنسخ الرابط.'))}
+    d.querySelector('.x').onclick=async()=>{if(!confirm('نحذفو الصفحة "'+p.product+'"؟ الطلبات القديمة غادي يبقاو.'))return;try{await api('/api/landing/delete',{id:p.id});say('✔ تحذفات.');loadPages()}catch(x){say(errText(x.message),true)}};
+    el.append(d)}
+  const f=$('fPage'),v=f.value;f.innerHTML='<option value="">الكل</option>'+pages.map(p=>`<option></option>`).join('');[...f.options].slice(1).forEach((o,i)=>{o.value=pages[i].id;o.textContent=pages[i].product});f.value=v;
+}
+
+// ---------- orders ----------
+let orders=[],cursor=null;
+Object.entries(STATUS).forEach(([k,v])=>$('fStatus').append(new Option(v,k)));
+function waNumber(p){let d=p.replace(/\D/g,'');if(p.startsWith('+'))return d;if(/^0[5-7]\d{8}$/.test(d))return '212'+d.slice(1);return d}
+function drawOrders(){
+  const s=$('fStatus').value,pg=$('fPage').value,list=orders.filter(o=>(!s||o.status===s)&&(!pg||o.page_id===pg));
+  const counts={};orders.forEach(o=>counts[o.status]=(counts[o.status]||0)+1);
+  $('summary').innerHTML=Object.entries(STATUS).filter(([k])=>counts[k]).map(([k,v])=>`<span>${v}: <b>${counts[k]}</b></span>`).join('');
+  $('newCount').textContent=counts.new?'('+counts.new+')':'';
+  const tb=$('orderRows');tb.innerHTML=list.length?'':'<tr><td colspan="7" class="hint">ماكاين حتى طلب.</td></tr>';
+  for(const o of list){const tr=document.createElement('tr');
+    tr.innerHTML=`<td></td><td></td><td></td><td></td><td dir="ltr"><a class="tel"></a><br><a class="wa" target="_blank" rel="noopener">WhatsApp</a></td><td></td><td><select></select></td>`;
+    const c=tr.children,t=new Date(o.created_at);
+    c[0].textContent=t.toLocaleDateString('fr-MA')+' '+t.toLocaleTimeString('fr-MA',{hour:'2-digit',minute:'2-digit'});
+    c[1].textContent=o.product;c[2].textContent=(o.offer?.label||('×'+(o.offer?.qty||1)))+' · '+(o.offer?.price??'')+' '+(o.currency||'');
+    c[3].textContent=o.name;const tel=tr.querySelector('.tel');tel.textContent=o.phone;tel.href='tel:'+o.phone;tr.querySelector('.wa').href='https://wa.me/'+waNumber(o.phone);
+    c[5].textContent=o.city+(o.address?' — '+o.address:'');
+    const sel=tr.querySelector('select');Object.entries(STATUS).forEach(([k,v])=>sel.append(new Option(v,k)));sel.value=o.status;
+    sel.onchange=async()=>{sel.disabled=true;try{const d=await api('/api/orders/status',{id:o.id,status:sel.value});Object.assign(o,d.order);drawOrders()}catch(x){say(errText(x.message),true);sel.value=o.status}sel.disabled=false};
+    tb.append(tr)}
+}
+async function loadOrders(more){
+  try{const d=await api('/api/orders'+(more&&cursor?'?cursor='+encodeURIComponent(cursor):''));orders=more?orders.concat(d.items):d.items;cursor=d.cursor;$('moreWrap').hidden=!cursor;drawOrders()}catch(x){say(errText(x.message),true)}
+}
+$('fStatus').onchange=$('fPage').onchange=drawOrders;$('refresh').onclick=()=>loadOrders();$('more').onclick=()=>loadOrders(true);
+$('csv').onclick=()=>{
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"',rows=[['date','product','offer','qty','price','currency','name','phone','city','address','status']];
+  orders.forEach(o=>rows.push([o.created_at,o.product,o.offer?.label,o.offer?.qty,o.offer?.price,o.currency,o.name,o.phone,o.city,o.address,o.status]));
+  // A leading = @ (or + - not followed by a plain number) would run as a formula in Excel: prefix with a quote.
+  const csv='﻿'+rows.map(r=>r.map(v=>q(/^[=@]|^[+\-](?!\d+$)/.test(String(v??''))?"'"+v:v)).join(',')).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='orders-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+};
+
+function tab(o){$('tabPages').setAttribute('aria-selected',!o);$('tabOrders').setAttribute('aria-selected',o);$('viewPages').hidden=o;$('viewOrders').hidden=!o;if(o)loadOrders()}
+$('tabPages').onclick=()=>tab(false);$('tabOrders').onclick=()=>tab(true);
+loadPages().then(()=>loadOrders());
+</script>
