@@ -46,6 +46,28 @@ jobs:
         run: |
           [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || unset CLOUDFLARE_ACCOUNT_ID
           npx wrangler deploy
+      - name: Copy app secrets from GitHub to Cloudflare
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        # Only secrets that are set in GitHub are copied; others are left as they are in Cloudflare.
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          VOICE_OWNER_ID: ${{ secrets.VOICE_OWNER_ID }}
+        run: |
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || unset CLOUDFLARE_ACCOUNT_ID
+          node -e '
+            const out = {};
+            for (const k of ["GEMINI_API_KEY", "VOICE_OWNER_ID"]) {
+              let v = (process.env[k] || "").trim();
+              if (k === "VOICE_OWNER_ID") v = v.toLowerCase();
+              if (v) out[k] = v;
+            }
+            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(out), { mode: 0o600 });
+            console.log("Secrets to copy:", Object.keys(out).join(", ") || "none");
+          '
+          if [ "$(cat "$RUNNER_TEMP/secrets.json")" != "{}" ]; then
+            npx wrangler secret bulk "$RUNNER_TEMP/secrets.json"
+          fi
+          rm -f "$RUNNER_TEMP/secrets.json"
       - name: Skip deploy
         if: env.CLOUDFLARE_API_TOKEN == ''
         run: echo "CLOUDFLARE_API_TOKEN is not set; see CLOUDFLARE-SETUP.md"
