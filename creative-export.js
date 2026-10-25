@@ -1,11 +1,20 @@
-import {Input,ALL_FORMATS,BlobSource,VideoSampleSink,Output,WebMOutputFormat,BufferTarget,CanvasSource,AudioBufferSource} from 'mediabunny';
+import {Input,ALL_FORMATS,BlobSource,VideoSampleSink,Output,Mp4OutputFormat,WebMOutputFormat,BufferTarget,CanvasSource,AudioBufferSource,canEncodeVideo,canEncodeAudio} from 'mediabunny';
+
+// Meta and TikTok expect MP4 (H.264 + AAC); fall back to WebM only where the browser cannot encode it.
+async function pickFormat(canvas){
+  const size={width:canvas.width,height:canvas.height,bitrate:6000000};
+  if(await canEncodeVideo('avc',size)&&await canEncodeAudio('aac',{bitrate:128000}))return {format:new Mp4OutputFormat({fastStart:'in-memory'}),video:'avc',audio:'aac',bitrate:6000000,mime:'video/mp4',ext:'mp4'};
+  return {format:new WebMOutputFormat(),video:'vp8',audio:'opus',bitrate:4000000,mime:'video/webm',ext:'webm'};
+}
 
 // Encode explicit frame timestamps, independent of playback, tab focus or wall-clock speed.
 export async function exportMontage({clips,voice,canvas,onProgress,isCancelled}){
   if(typeof VideoEncoder==='undefined'||typeof AudioEncoder==='undefined')throw Error('التصدير الدقيق كيحتاج Chrome حديث.');
-  const target=new BufferTarget(),output=new Output({format:new WebMOutputFormat(),target});
-  const video=new CanvasSource(canvas,{codec:'vp8',bitrate:2500000});
-  const audio=new AudioBufferSource({codec:'opus',bitrate:128000});
+  const kind=await pickFormat(canvas);
+  const target=new BufferTarget(),output=new Output({format:kind.format,target});
+  const video=new CanvasSource(canvas,{codec:kind.video,bitrate:kind.bitrate});
+  // Match the AAC layout probed in pickFormat so mono or 24 kHz narration still encodes.
+  const audio=new AudioBufferSource({codec:kind.audio,bitrate:128000,transform:kind.audio==='aac'?{numberOfChannels:2,sampleRate:48000}:undefined});
   output.addVideoTrack(video);output.addAudioTrack(audio);
   const ctx=new AudioContext(),inputs=new Map();let finalized=false;
   try{
@@ -40,7 +49,7 @@ export async function exportMontage({clips,voice,canvas,onProgress,isCancelled})
       offset+=duration;
     }
     video.close();await output.finalize();finalized=true;
-    return {blob:new Blob([target.buffer],{type:'video/webm'}),duration:total,frames,fps:25};
+    return {blob:new Blob([target.buffer],{type:kind.mime}),ext:kind.ext,duration:total,frames,fps:25};
   }finally{
     for(const media of inputs.values())media.input.dispose();
     if(!finalized)try{await output.cancel()}catch{}

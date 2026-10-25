@@ -1,0 +1,16 @@
+# Cloudflare Workers deployment. See CLOUDFLARE-SETUP.md.
+name = "cod-pilot"
+main = "cloudflare/entry.js"
+compatibility_date = "2026-10-01"
+
+[build]
+command = "npm run build"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "cod-pilot-media"
+
+# Not secret: fill these in after creating the Cloudflare Access application.
+[vars]
+ACCESS_TEAM_DOMAIN = ""
+ACCESS_AUD = ""
