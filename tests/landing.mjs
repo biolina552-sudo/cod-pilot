@@ -84,6 +84,11 @@ assert.deepEqual(Object.keys(scenePage.scene_captions),[up.id]);
 const capHtml=await (await shopGet('/caption-test')).text();
 assert.ok(capHtml.includes('<figure class="poster"><h3>سخونة &lt;b&gt;فـ 30 دقيقة&lt;/b&gt;</h3><img'));
 assert.ok(capHtml.includes('class="top"')&&capHtml.includes('class="offer"'));
+// The result section: before/after rows and gains, escaped; empty pairs dropped.
+{const rp=(await (await call('/api/landing/save',{body:{...draft,slug:'result-test',results:['<i>ترتاح</i>'],before_after:[{before:'تعب',after:'راحة'},{before:'x'}]}})).json()).page;
+assert.deepEqual(rp.before_after,[{before:'تعب',after:'راحة'}]);const h=await (await shopGet('/result-test')).text();
+assert.ok(h.includes('class="pad gain"')&&h.includes('<span class="bb">تعب</span><span class="aa">راحة</span>')&&h.includes('&lt;i&gt;ترتاح'));
+assert.ok(h.includes('الحل ديالك غير بـ'));assert.ok(!capHtml.includes('class="pad gain"'))}
 // Title + ribbon line, and niche templates (unknown niche falls back to general).
 const nichePage=(await (await call('/api/landing/save',{body:{...draft,id:scenePage.id,slug:'caption-test',niche:'beauty',color:'',scene_images:[up.id],scene_captions:{[up.id]:{t:'بشرة نقية',s:'فـ 7 أيام <i>'}}}})).json()).page;
 assert.equal(nichePage.niche,'beauty');assert.equal(nichePage.color,'#b0195a');
@@ -125,11 +130,12 @@ globalThis.fetch=async(url,opt)=>{
   if(String(url).includes('/models?'))return new Response(JSON.stringify({models:[{name:'models/gemini-9-flash-image-preview',supportedGenerationMethods:['generateContent']},{name:'models/imagen-5',supportedGenerationMethods:['predict']},{name:'models/gemini-3.6-flash',supportedGenerationMethods:['generateContent']}]}));
   calls.push({url:String(url),body:JSON.parse(opt.body),headers:opt.headers});
   if(String(url).includes('image'))return new Response(JSON.stringify({candidates:[{content:{parts:[{inlineData:{mimeType:'image/png',data:Buffer.from([0x89,0x50,0x4e,0x47,1,2,3]).toString('base64')}}]}}]}));
-  return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({product:'ساعة',slug:'Montre Smart!!',headline:'h',subheadline:'s',problem_title:'p',problems:['a'],solution:'b',bullets:['c'],features:[],description:'d',faq:[],cta:'اطلب',color:'#123456',image_prompts:['x','y','z','w']})}]}}]}));};
+  return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({product:'ساعة',slug:'Montre Smart!!',headline:'h',subheadline:'s',problem_title:'p',problems:['a'],solution:'b',bullets:['c'],features:[],description:'d',faq:[],cta:'اطلب',color:'#123456',image_prompts:['x','y','z','w'],results:['غادي ترتاح',''],before_after:[{before:'تعب',after:'راحة'},{before:'',after:'x'}]})}]}}]}));};
 const otherImg=(await (await call('/api/landing/image',{user:'other@test.com',raw:jpeg})).json()).id;
 assert.equal((await call('/api/landing/ai-copy',{body:{images:[otherImg]}})).status,400);
 r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});const copy=(await r.json()).copy;
-assert.equal(copy.slug,'montre-smart');assert.equal(copy.image_prompts.length,4);
+assert.equal(copy.slug,'montre-smart');assert.deepEqual(copy.results,['غادي ترتاح']);assert.deepEqual(copy.before_after,[{before:'تعب',after:'راحة'}]);
+assert.ok(/buy a SOLUTION/.test(calls[0].body.contents[0].parts.at(-1).text));assert.equal(copy.image_prompts.length,4);
 assert.ok(calls[0].body.contents[0].parts[0].inline_data.data);assert.ok(/Darija/.test(calls[0].body.contents[0].parts.at(-1).text));
 assert.equal(calls[0].headers['x-goog-api-key'],'test-gemini-key');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}});const gen=await r.json();

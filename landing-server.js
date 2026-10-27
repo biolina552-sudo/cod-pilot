@@ -98,12 +98,14 @@ const LP_LANG_NAMES={ar:'Moroccan Darija written in Arabic script (natural, the 
 const LP_COPY_SCHEMA={type:'object',properties:{
   product:{type:'string'},slug:{type:'string'},headline:{type:'string'},subheadline:{type:'string'},
   problem_title:{type:'string'},problems:{type:'array',items:{type:'string'}},solution:{type:'string'},
+  results_title:{type:'string'},results:{type:'array',items:{type:'string'}},
+  before_after:{type:'array',items:{type:'object',properties:{before:{type:'string'},after:{type:'string'}},required:['before','after']}},
   bullets:{type:'array',items:{type:'string'}},
   features:{type:'array',items:{type:'object',properties:{icon:{type:'string'},title:{type:'string'},text:{type:'string'}},required:['icon','title','text']}},
   description:{type:'string'},
   faq:{type:'array',items:{type:'object',properties:{q:{type:'string'},a:{type:'string'}},required:['q','a']}},
   cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}},image_subcaptions:{type:'array',items:{type:'string'}}
-},required:['product','slug','headline','subheadline','problem_title','problems','solution','bullets','features','description','faq','cta','color','image_prompts','image_captions','image_subcaptions']};
+},required:['product','slug','headline','subheadline','problem_title','problems','solution','results_title','results','before_after','bullets','features','description','faq','cta','color','image_prompts','image_captions','image_subcaptions']};
 
 function lpCopyPrompt(lang,product,notes,niche){
   const hint=Object.hasOwn(LP_NICHES,niche)?LP_NICHES[niche].hint:"";
@@ -111,11 +113,14 @@ function lpCopyPrompt(lang,product,notes,niche){
 Look carefully at the product photos${product?` (the seller calls it: "${product}")`:''}.${notes?`\nSeller notes: ${notes}`:''}
 ${hint?`Niche: ${hint}\n`:''}Write the whole landing page in ${LP_LANG_NAMES[lang]}.
 
-Structure it around the customer's PROBLEM (problem → agitate → solution):
+The customer does not buy a product, they buy a SOLUTION: the result and the better life after using it.
+Structure it around the customer's PROBLEM and the RESULT they get (problem → agitate → solution → result):
 - headline: name the painful everyday problem or the desired result in one punchy line (max 12 words).
 - subheadline: how this product solves it, in one sentence.
 - problem_title + problems: 3-4 short, concrete, relatable frustrations the buyer lives with today.
 - solution: 1-2 sentences presenting the product as the simple fix.
+- results_title + results: 4 short lines (4-9 words) on what changes in the customer's life after using it, each a concrete result they feel or see, talking to them as "you" (e.g. "غادي تربح نص ساعة كل صباح").
+- before_after: exactly 3 pairs, each "before" a frustration from today and "after" the same moment once the product solves it, 2-6 words each (e.g. before "رجلين ناشفين ومشققين", after "رجلين ناعمين فـ 5 دقايق").
 - bullets: 4-6 short benefits (result first, not specs).
 - features: exactly 4 items, each an emoji icon, a 2-4 word title and one short sentence.
 - description: 2 short paragraphs on how it is used and why it is worth it.
@@ -123,11 +128,12 @@ Structure it around the customer's PROBLEM (problem → agitate → solution):
 - cta: a 2-4 word order button.
 - product: a short product name. slug: 2-4 lowercase latin words joined by "-" for the URL.
 - color: one hex brand color that fits the product photos and stays readable with white text.
-- image_prompts: exactly 8 English descriptions of different, realistic photo scenes for this product, in this order:
-  (1) the product in use, clearly solving the problem; (2) a close-up of quality, materials and details; (3) a happy customer using it in a modern Moroccan home or setting;
-  (4) the "before" frustration moment the product removes, with the product nearby; (5) a clean studio hero shot on a soft colored background matching the brand color;
-  (6) the product in a second everyday place (work, car, outdoors, travel... whatever fits); (7) hands showing how easy it is to use, step by step; (8) a lifestyle flat-lay of the product with related everyday items.
-- image_captions: exactly 8 poster titles, one per image_prompt in the same order, written in the page language. Each is 2-5 words, printed huge and bold above the photo. The first one names the customer's problem or desired result (e.g. "بلا ما تشعل الفران..."), the others are punchy, benefit-first (e.g. "سخونة فـ 30 دقيقة"). No final punctuation except an optional "...".
+- image_prompts: exactly 8 English descriptions of different, realistic photo scenes. Each one must SHOW THE RESULT the customer gets (the problem visibly solved, the relief, the visible improvement), with the product present, in this order:
+  (1) the product in use with the problem visibly solved right now; (2) a happy, relieved customer enjoying the result in a modern Moroccan home or setting;
+  (3) a split before/after composition: left side the frustrating "before" situation, right side the same situation solved with the product; (4) a close-up of the visible result (clean, smooth, organized, comfortable... whatever fits) with the product;
+  (5) hands showing how easy it is to use, step by step; (6) the result in a second everyday place (work, car, outdoors, travel... whatever fits);
+  (7) the customer sharing the result with family or friends, smiling; (8) a clean studio hero shot of the product on a soft colored background matching the brand color.
+- image_captions: exactly 8 poster titles, one per image_prompt in the same order, written in the page language. Each is 2-5 words, printed huge and bold above the photo. Each one states the RESULT the customer gets, not a product spec: the first names the problem solved or the desired result (e.g. "بلا ما تشعل الفران..."), the others are punchy results (e.g. "ماكلة سخونة فـ 30 دقيقة", "رجلين ناعمين فـ 5 دقايق"), never "powerful device" style claims. No final punctuation except an optional "...".
 - image_subcaptions: exactly 8 short lines (3-7 words), one per title, printed in a colored ribbon under it, completing or explaining the title (e.g. "كيبقى سخون حتى توصل للخدمة").
 
 Rules: short sentences, simple words, no hashtags. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
@@ -207,7 +213,8 @@ async function handleLanding(request,env,user,u){
       if(copy.slug.length<3)copy.slug+='-shop';
       copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,8);
       const lines=(v,max)=>(Array.isArray(v)?v:[]).map(String).map(s=>s.trim().slice(0,max)).slice(0,8);
-      copy.image_captions=lines(copy.image_captions,60);copy.image_subcaptions=lines(copy.image_subcaptions,80);
+      copy.image_captions=lines(copy.image_captions,60);copy.results=lines(copy.results,140).filter(Boolean).slice(0,6);
+      copy.before_after=(Array.isArray(copy.before_after)?copy.before_after:[]).map(x=>({before:String(x?.before||'').trim().slice(0,100),after:String(x?.after||'').trim().slice(0,100)})).filter(x=>x.before&&x.after).slice(0,4);copy.image_subcaptions=lines(copy.image_subcaptions,80);
       return json({success:true,copy});
     }
     if(u.pathname==='/api/landing/ai-image'&&request.method==='POST'){
