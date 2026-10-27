@@ -136,6 +136,7 @@ assert.equal((await call('/api/landing/ai-copy',{body:{images:[otherImg]}})).sta
 r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});const copy=(await r.json()).copy;
 assert.equal(copy.slug,'montre-smart');assert.deepEqual(copy.results,['غادي ترتاح']);assert.deepEqual(copy.before_after,[{before:'تعب',after:'راحة'}]);
 assert.ok(/buy a SOLUTION/.test(calls[0].body.contents[0].parts.at(-1).text));
+assert.ok(/Never use health or medical words/.test(calls[0].body.contents[0].parts.at(-1).text)&&/never a face/.test(calls[0].body.contents[0].parts.at(-1).text));
 // No template chosen: the AI is asked to pick one, and an unknown answer falls back to general.
 assert.equal(copy.niche,'general');assert.ok(/- niche: .*kitchen \(Kitchen and cooking\)/.test(calls[0].body.contents[0].parts.at(-1).text));
 assert.ok(calls[0].body.generationConfig.responseSchema.properties.niche.enum.includes('pets'));assert.equal(copy.image_prompts.length,4);
@@ -144,6 +145,8 @@ assert.equal(calls[0].headers['x-goog-api-key'],'test-gemini-key');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}});const gen=await r.json();
 assert.match(gen.id,/\.png$/);assert.deepEqual(calls[1].body.generationConfig.responseModalities,['IMAGE']);
 assert.ok(calls[1].url.includes('/gemini-9-flash-image-preview:'));
+// Image prompts ask for a believable phone photo, not a glossy render.
+assert.ok(/smartphone by a real customer/.test(JSON.stringify(calls[1].body))&&/Not CGI/.test(JSON.stringify(calls[1].body)));
 // An answer with no image is skipped: the next request shape gets its turn.
 {const keep=globalThis.fetch;let n=0;globalThis.fetch=async(url,opt)=>String(url).includes('/models?')||n++?keep(url,opt):new Response('{"candidates":[]}');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.match((await r.json()).id,/\.png$/);globalThis.fetch=keep}

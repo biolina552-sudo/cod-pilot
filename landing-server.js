@@ -131,15 +131,15 @@ Structure it around the customer's PROBLEM and the RESULT they get (problem → 
 - cta: a 2-4 word order button.
 ${pick}- product: a short product name. slug: 2-4 lowercase latin words joined by "-" for the URL.
 - color: one hex brand color that fits the product photos and stays readable with white text.
-- image_prompts: exactly 8 English descriptions of different, realistic photo scenes. Each one must SHOW THE RESULT the customer gets (the problem visibly solved, the relief, the visible improvement), with the product present, in this order:
-  (1) the product in use with the problem visibly solved right now; (2) a happy, relieved customer enjoying the result in a modern Moroccan home or setting;
-  (3) a split before/after composition: left side the frustrating "before" situation, right side the same situation solved with the product; (4) a close-up of the visible result (clean, smooth, organized, comfortable... whatever fits) with the product;
+- image_prompts: exactly 8 English descriptions of different, ordinary, believable photo scenes that a real customer could take with a phone at home. Each one SHOWS THE RESULT (the problem solved, the relief, the visible improvement) with the product present. No glowing effects, no anatomy overlays, no fantasy, no studio perfection. People appear only as hands, arms, or seen from behind or from the shoulders down; never a face. In this order:
+  (1) close-up of hands using the product exactly as intended in a real Moroccan home, the problem being solved; (2) the product placed naturally on the everyday surface where it is used (bathroom shelf, kitchen counter, bedside table, car seat... whatever fits), like a customer's own photo;
+  (3) the customer enjoying the result, seen from behind or from the shoulders down, in a real Moroccan home; (4) a close-up of the visible result (clean, smooth, organized, comfortable... whatever fits) with the product nearby;
   (5) hands showing how easy it is to use, step by step; (6) the result in a second everyday place (work, car, outdoors, travel... whatever fits);
-  (7) the customer sharing the result with family or friends, smiling; (8) a clean studio hero shot of the product on a soft colored background matching the brand color.
+  (7) the product held in one hand in front of a real everyday Moroccan background; (8) the product and its box on a wooden table, photographed by a customer who just received it.
 - image_captions: exactly 8 poster titles, one per image_prompt in the same order, written in the page language. Each is 2-5 words, printed huge and bold above the photo. Each one states the RESULT the customer gets, not a product spec: the first names the problem solved or the desired result (e.g. "بلا ما تشعل الفران..."), the others are punchy results (e.g. "ماكلة سخونة فـ 30 دقيقة", "رجلين ناعمين فـ 5 دقايق"), never "powerful device" style claims. No final punctuation except an optional "...".
 - image_subcaptions: exactly 8 short lines (3-7 words), one per title, printed in a colored ribbon under it, completing or explaining the title (e.g. "كيبقى سخون حتى توصل للخدمة").
 
-Rules: short sentences, simple words, no hashtags. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
+Rules: short sentences, simple words, no hashtags. Never use health or medical words (health, cure, treat, heal, disease, doctor, صحة, صحتك, علاج, دوا, شفاء, مرض, طبيب): talk about comfort, ease and daily life instead. Spell every word correctly and re-read each line for typos before answering. Do NOT mention prices, discounts or stock. Do NOT invent reviews, ratings, numbers of customers, certifications, guarantees, medical or health claims, or anything you cannot see in the photos.`;
 }
 
 async function handleLanding(request,env,user,u){
@@ -226,10 +226,10 @@ async function handleLanding(request,env,user,u){
       const b=await body(8192);if(!b||typeof b.prompt!=='string'||!b.prompt.trim())return json({success:false,error:'INVALID_REQUEST'},400);
       const imgs=await lpLoadImages(env,user,b.images);if(!imgs)return json({success:false,error:'INVALID_IMAGES'},400);
       const parts=lpParts(imgs);
-      const prompt=`Create a professional, photorealistic e-commerce photo for a product landing page.
+      const prompt=`Create a realistic photo of this product for a product landing page.
 Use the EXACT product shown in the reference photo(s): keep its shape, colors, materials, logo and details identical. Do not redesign it.
 Scene: ${b.prompt.slice(0,600)}
-Style: high-end advertising photography, natural soft light, sharp focus on the product, realistic people and hands if any, clean uncluttered background. No text, no letters, no logos added, no watermark, no borders.`;
+Style: an authentic photo taken with a recent smartphone by a real customer: natural daylight from a window, true-to-life colors, real textures, slight natural imperfections, an ordinary lived-in Moroccan home. Not CGI, not a 3D render, not an illustration, no glowing effects, no anatomy overlays, no over-smoothed skin. If people appear, show only hands, arms or the person from behind, faces not visible. No text, no letters, no logos added, no watermark, no borders.`;
       // Free Cloudflare first; Gemini (paid images) only if Cloudflare fails and a key is set.
       let cfErr=null;
       if(env.AI){try{const g=await lpCfImage(env,imgs,prompt,b.aspect);return json({success:true,id:await lpPutImage(env,user,g.bytes,g.type),source:'cloudflare'})}catch(e){cfErr=e}}

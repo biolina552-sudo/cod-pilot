@@ -41,7 +41,7 @@ details.more{margin:12px 0;border:1px dashed var(--line);border-radius:12px;padd
     </div>
     <label>القالب (النيتش)<select id="wNiche" class="niche"><option value="">🤖 تلقائي (الذكاء الاصطناعي يختار)</option></select></label>
     <label>سمية المنتج<input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
-    <label>شحال من تصويرة احترافية يولد الذكاء الاصطناعي؟<select id="wCount"><option value="0">بلا تصاور</option><option value="3">3 تصاور</option><option value="6" selected>6 تصاور</option><option value="8">8 تصاور</option></select></label>
+    <label>شحال من تصويرة احترافية يولد الذكاء الاصطناعي؟<select id="wCount"><option value="0">بلا تصاور</option><option value="3" selected>3 تصاور</option><option value="6">6 تصاور</option><option value="8">8 تصاور</option></select></label>
     </details>
     <p><button class="big" id="wGo">✨ صاوب الصفحة</button></p>
     <ol class="steps" id="wSteps" hidden></ol>
@@ -183,7 +183,7 @@ $('wFiles').onchange=async e=>{
 };
 function drawW(){thumbs($('wThumbs'),wImages,{redraw:drawW})}
 function steps(list,at){const ol=$('wSteps');ol.hidden=false;ol.innerHTML=list.map((s,i)=>`<li class="${i<at?'done':i===at?'now':''}">${i<at?'✔ ':i===at?'⏳ ':''}${s}</li>`).join('')}
-function suggestOffers(p){const two=Math.max(p,Math.round(p*1.8/10)*10-1);return [{qty:1,price:p,label:''},{qty:2,price:two,label:''}]}
+function suggestOffers(p,lang){const two=Math.max(p,Math.round(p*1.8/10)*10-1);return [{qty:1,price:p,label:''},{qty:2,price:two,label:{ar:'2 حبات + توصيل فابور',fr:'2 pièces + livraison gratuite',en:'2 items + free delivery'}[lang]||''}]}
 $('wGo').onclick=async()=>{
   const price=parseFloat($('wPrice').value);
   if(!wImages.length)return say('زيد على الأقل تصويرة وحدة ديال المنتج.',true);
@@ -207,10 +207,12 @@ $('wGo').onclick=async()=>{
       await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);caps[id]={t:copy.image_captions?.[i]||'',s:copy.image_subcaptions?.[i]||''}}});
     }
     const aiPhotos=scenes.length;
-    if(aiPhotos&&(copy.before_after||[]).length){
-      // AI photos show the result; the before/after poster spells it out.
-      const nc=(niches.find(n=>n.id===niche)||{}).color||copy.color||'#196c58';
-      const id=await upPoster(()=>baPng(wImages[0],copy.before_after,/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58',lang));if(id)scenes.splice(Math.min(2,scenes.length),0,id);
+    if(aiPhotos){
+      // Mix in posters made from the seller's real photos: the real product stays in front,
+      // and the before/after poster spells out the result.
+      const nc=(niches.find(n=>n.id===niche)||{}).color||copy.color||'#196c58',col=/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58';
+      const real=await upPoster(()=>posterPng(wImages[1]||wImages[0],{t:copy.product,s:copy.results?.[0]||copy.subheadline},col,lang==='ar',niche,'image/jpeg'));if(real)scenes.splice(1,0,real);
+      if((copy.before_after||[]).length){const id=await upPoster(()=>baPng(wImages[0],copy.before_after,col,lang));if(id)scenes.splice(Math.min(3,scenes.length),0,id)}
     }
     if(!aiPhotos){
       // No AI photos (none asked, or Gemini failed): build designed posters from code instead.
@@ -220,10 +222,10 @@ $('wGo').onclick=async()=>{
     }
     steps(list,list.length-1);
     const old=parseFloat($('wOld').value);
-    openEditor({...copy,niche,color:(niches.find(n=>n.id===niche)||{}).color||copy.color,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
+    openEditor({...copy,niche,color:(niches.find(n=>n.id===niche)||{}).color||copy.color,lang,currency:$('wCurrency').value,offers:suggestOffers(price,lang),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
     steps(list,list.length);
     // Keep image errors visible: otherwise the success message hides why photos are missing.
-    const why=count&&!aiPhotos?'⚠️ تصاور Gemini ماتولداتش'+(imgErrs.size?' ('+[...imgErrs].join(' / ')+')':'')+'. ':'';
+    const why=count&&!aiPhotos?'⚠️ تصاور AI ماتولداتش'+(imgErrs.size?' ('+[...imgErrs].join(' / ')+')':'')+'. ':'';
     if(!scenes.length)say(why+'⚠️ ماقدرتش نصاوب حتى بوستر من التصاور ديالك. النص واجد: زيد تصاور ولا عاود جرب، ومن بعد "حفظ ونشر".',true);
     else if(why)say(why+'عوضتهم بـ '+scenes.length+' بوسترات مصممة من التصاور ديالك. راجع الصفحة ومن بعد كليكي "حفظ ونشر".',true);
     else say('✔ الصفحة واجدة'+(imgErrs.size?' (شي تصاور ماتولداتش: '+[...imgErrs].join(' / ')+')':'')+'. راجع النص والتصاور، ومن بعد كليكي "حفظ ونشر".');
