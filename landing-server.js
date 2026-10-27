@@ -16,16 +16,38 @@ async function lpPutImage(env,user,bytes,type){
   await env.BUCKET.put('public-images/'+id,bytes,{httpMetadata:{contentType:type},customMetadata:{owner:user}});
   return id;
 }
-// Loads the user's own uploaded images as Gemini inline parts.
-async function lpImageParts(env,user,ids){
+// Loads the user's own uploaded images (bytes + type); null if any is missing or not theirs.
+async function lpLoadImages(env,user,ids){
   if(!Array.isArray(ids)||!ids.length||ids.length>4||!ids.every(i=>typeof i==='string'&&LP_IMAGE_RE.test(i)))return null;
-  const parts=[];
+  const out=[];
   for(const id of ids){
     const o=await env.BUCKET.get('public-images/'+id);
     if(!o||o.customMetadata?.owner!==user)return null;
-    parts.push({inline_data:{mime_type:o.httpMetadata?.contentType||'image/jpeg',data:lpB64(new Uint8Array(await o.arrayBuffer()))}});
+    out.push({type:o.httpMetadata?.contentType||'image/jpeg',bytes:new Uint8Array(await o.arrayBuffer())});
   }
-  return parts;
+  return out;
+}
+const lpParts=imgs=>imgs.map(i=>({inline_data:{mime_type:i.type,data:lpB64(i.bytes)}}));
+async function lpImageParts(env,user,ids){const imgs=await lpLoadImages(env,user,ids);return imgs&&lpParts(imgs)}
+
+// Free image generation on Cloudflare Workers AI (daily free allowance). FLUX.2 klein
+// takes the product photos as references (each under 512x512) so the product stays the same.
+const LP_CF_IMAGE_MODEL='@cf/black-forest-labs/flux-2-klein-9b';
+async function lpCfImage(env,refs,prompt,aspect){
+  const form=new FormData();
+  form.append('prompt',prompt);form.append('width','1024');form.append('height',aspect==='4:5'?'1280':'1024');
+  refs.forEach((r,i)=>form.append('input_image_'+i,new Blob([r.bytes],{type:r.type}),'ref'+i));
+  const req=new Response(form);
+  let out;
+  try{out=await env.AI.run(LP_CF_IMAGE_MODEL,{multipart:{body:req.body,contentType:req.headers.get('content-type')}})}
+  catch(e){
+    const msg=String(e?.message||e).slice(0,200);console.error('LANDING_CF',msg);
+    throw Object.assign(Error('cf'),{code:/4006|daily free allocation|neurons/i.test(msg)?'CF_DAILY_LIMIT':'CF_FAILED',detail:'cloudflare: '+msg});
+  }
+  const bytes=out?.image?Uint8Array.from(atob(out.image),c=>c.charCodeAt(0)):null;
+  const type=bytes&&lpSniff(bytes);
+  if(!type)throw Object.assign(Error('cf'),{code:'CF_FAILED',detail:'cloudflare: no image in the answer'});
+  return {bytes,type};
 }
 // Gemini is often briefly overloaded: wait and try again before giving up.
 async function lpGeminiRetry(env,model,body){
@@ -48,7 +70,7 @@ async function lpGemini(env,model,body){
     console.error('LANDING_AI',model,r.status,msg);
     const busy=[500,502,503,504].includes(r.status)||/overloaded|UNAVAILABLE/.test(msg);
     // detail is shown to the app owner only (AI routes are owner-only) so a failure can be diagnosed.
-    throw Object.assign(Error('provider'),{status:r.status,detail:model+' '+r.status+': '+msg.replace(/\s+/g,' ').slice(0,200),code:busy?'AI_BUSY':r.status===429?(/limit: 0\b|free_tier/i.test(msg)?'AI_IMAGE_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
+    throw Object.assign(Error('provider'),{status:r.status,detail:model+' '+r.status+': '+msg.replace(/\s+/g,' ').slice(0,200),code:busy?'AI_BUSY':r.status===429?(/limit: 0\b|free_tier|exceeded your current quota|billing/i.test(msg)?'GEMINI_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
   }
   const d=await r.json();
   if(d.promptFeedback?.blockReason)throw Object.assign(Error('blocked'),{code:'AI_CONTENT_BLOCKED'});
@@ -189,17 +211,28 @@ async function handleLanding(request,env,user,u){
       return json({success:true,copy});
     }
     if(u.pathname==='/api/landing/ai-image'&&request.method==='POST'){
-      if(!env.GEMINI_API_KEY||user!==env.VOICE_OWNER_ID)return json({success:false,error:'AI_NOT_CONFIGURED'},503);
+      if(!(env.AI||env.GEMINI_API_KEY)||user!==env.VOICE_OWNER_ID)return json({success:false,error:'AI_NOT_CONFIGURED'},503);
       const b=await body(8192);if(!b||typeof b.prompt!=='string'||!b.prompt.trim())return json({success:false,error:'INVALID_REQUEST'},400);
-      const parts=await lpImageParts(env,user,b.images);if(!parts)return json({success:false,error:'INVALID_IMAGES'},400);
+      const imgs=await lpLoadImages(env,user,b.images);if(!imgs)return json({success:false,error:'INVALID_IMAGES'},400);
+      const parts=lpParts(imgs);
       const prompt=`Create a professional, photorealistic e-commerce photo for a product landing page.
 Use the EXACT product shown in the reference photo(s): keep its shape, colors, materials, logo and details identical. Do not redesign it.
 Scene: ${b.prompt.slice(0,600)}
 Style: high-end advertising photography, natural soft light, sharp focus on the product, realistic people and hands if any, clean uncluttered background. No text, no letters, no logos added, no watermark, no borders.`;
+      // Free Cloudflare first; Gemini (paid images) only if Cloudflare fails and a key is set.
+      let cfErr=null;
+      if(env.AI){try{const g=await lpCfImage(env,imgs,prompt,b.aspect);return json({success:true,id:await lpPutImage(env,user,g.bytes,g.type),source:'cloudflare'})}catch(e){cfErr=e}}
+      if(!env.GEMINI_API_KEY)throw cfErr;
       const req={contents:[{parts:[...parts,{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],imageConfig:{aspectRatio:b.aspect==='4:5'?'4:5':'1:1'}}};
       // Image model names change often: fall back to the next one if a model is gone.
       // Some image models want TEXT+IMAGE output and no imageConfig: try that shape too.
-      const out=await lpGeminiFirst(env,await lpImageModels(env),()=>[req,{contents:req.contents,generationConfig:{responseModalities:['TEXT','IMAGE']}}],parts=>parts.some(p=>(p.inlineData||p.inline_data)?.data));
+      let out;
+      try{out=await lpGeminiFirst(env,await lpImageModels(env),()=>[req,{contents:req.contents,generationConfig:{responseModalities:['TEXT','IMAGE']}}],parts=>parts.some(p=>(p.inlineData||p.inline_data)?.data))}
+      catch(e){
+        // Both failed: Cloudflare's daily limit is the more useful thing to tell; keep both reasons.
+        if(!cfErr)throw e;
+        throw Object.assign(Error('both'),{code:cfErr.code==='CF_DAILY_LIMIT'?cfErr.code:e.code,detail:[cfErr.detail,e.detail].filter(Boolean).join(' | ')});
+      }
       const img=out.map(p=>p.inlineData||p.inline_data).find(d=>d?.data);
       if(!img)return json({success:false,error:'AI_NO_IMAGE'},502);
       const bytes=Uint8Array.from(atob(img.data),c=>c.charCodeAt(0)),type=lpSniff(bytes);

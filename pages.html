@@ -116,7 +116,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
 <script>
 const $=id=>document.getElementById(id);
 const STATUS={new:'🆕 جديد',confirmed:'✅ مؤكد',shipped:'🚚 مشحون',delivered:'📦 توصل',cancelled:'❌ ملغي',returned:'↩️ رجع'};
-const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDEN:'الطلب ممنوع. عاود حمّل الصفحة.',INVALID_SLUG:'الرابط خاصو يكون بحروف لاتينية صغار وأرقام و - (3 حتى 40 حرف).',SLUG_TAKEN:'هاد الرابط مستعمل. بدلو.',INVALID_PRODUCT:'دخل سمية المنتج.',INVALID_PRICE:'دخل الثمن.',INVALID_META_PIXEL:'Facebook Pixel ID خاصو يكون غير أرقام.',INVALID_TIKTOK_PIXEL:'TikTok Pixel ID ماشي صحيح.',INVALID_WHATSAPP:'رقم WhatsApp ماشي صحيح.',IMAGE_TOO_LARGE:'التصويرة كبيرة بزاف.',INVALID_IMAGE:'هاد الملف ماشي تصويرة (JPG/PNG/WEBP).',AI_NOT_CONFIGURED:'الذكاء الاصطناعي ماشي مفعّل (GEMINI_API_KEY و VOICE_OWNER_ID).',GEMINI_AUTH_FAILED:'مفتاح Gemini ماخدامش.',GEMINI_RATE_LIMITED:'Gemini عيا شوية. تسنى دقيقة وعاود.',AI_CONTENT_BLOCKED:'Gemini رفض هاد الطلب. جرب تصاور أخرى.',AI_NO_IMAGE:'Gemini ماعطاش تصويرة. عاود جرب.',AI_MODEL_UNAVAILABLE:'موديل Gemini ماشي متوفر فالحساب ديالك.',AI_IMAGE_NEEDS_BILLING:'توليد التصاور فـ Gemini خاصو تفعّل الفوترة (Billing) فـ Google AI Studio. النص خدام عادي.',AI_TIMEOUT:'Gemini طول بزاف. عاود جرب.',AI_BUSY:'Gemini عامر دابا. تسنى شوية وعاود جرب.',GENERATION_FAILED:'Gemini ماقدرش يصاوب هادشي.',INVALID_AI_RESPONSE:'جواب Gemini ماكانش واضح. عاود جرب.',INVALID_IMAGES:'التصاور ماشي صالحين. عاود زيدهم.'};
+const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDEN:'الطلب ممنوع. عاود حمّل الصفحة.',INVALID_SLUG:'الرابط خاصو يكون بحروف لاتينية صغار وأرقام و - (3 حتى 40 حرف).',SLUG_TAKEN:'هاد الرابط مستعمل. بدلو.',INVALID_PRODUCT:'دخل سمية المنتج.',INVALID_PRICE:'دخل الثمن.',INVALID_META_PIXEL:'Facebook Pixel ID خاصو يكون غير أرقام.',INVALID_TIKTOK_PIXEL:'TikTok Pixel ID ماشي صحيح.',INVALID_WHATSAPP:'رقم WhatsApp ماشي صحيح.',IMAGE_TOO_LARGE:'التصويرة كبيرة بزاف.',INVALID_IMAGE:'هاد الملف ماشي تصويرة (JPG/PNG/WEBP).',AI_NOT_CONFIGURED:'الذكاء الاصطناعي ماشي مفعّل (GEMINI_API_KEY و VOICE_OWNER_ID).',GEMINI_AUTH_FAILED:'مفتاح Gemini ماخدامش.',GEMINI_RATE_LIMITED:'Gemini عيا شوية. تسنى دقيقة وعاود.',AI_CONTENT_BLOCKED:'Gemini رفض هاد الطلب. جرب تصاور أخرى.',AI_NO_IMAGE:'Gemini ماعطاش تصويرة. عاود جرب.',AI_MODEL_UNAVAILABLE:'موديل Gemini ماشي متوفر فالحساب ديالك.',CF_DAILY_LIMIT:'الحصة الفابور ديال اليوم فـ Cloudflare سالات. كتجدد غدا (الساعة 1 ديال الليل بتوقيت المغرب).',CF_FAILED:'Cloudflare ماقدرش يصاوب التصويرة.',GEMINI_NEEDS_BILLING:'الكوطا ديال Gemini سالات (الحساب فابور): خاصك تفعّل الفوترة (Billing) فـ Google AI Studio.',AI_TIMEOUT:'Gemini طول بزاف. عاود جرب.',AI_BUSY:'Gemini عامر دابا. تسنى شوية وعاود جرب.',GENERATION_FAILED:'Gemini ماقدرش يصاوب هادشي.',INVALID_AI_RESPONSE:'جواب Gemini ماكانش واضح. عاود جرب.',INVALID_IMAGES:'التصاور ماشي صالحين. عاود زيدهم.'};
 const say=(t,bad)=>{const m=$('msg');m.textContent=t||'';m.classList.toggle('err',!!bad);if(t)m.scrollIntoView({block:'nearest'})};
 const errText=e=>ERR[e]||('وقع مشكل: '+e);
 // Adds Gemini's own reason (owner-only) so a failure can be sent to support as is.
@@ -136,6 +136,21 @@ async function shrink(file){
   const s=Math.min(1,1600/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);
   const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(bmp,0,0,c.width,c.height);
   return await new Promise(res=>c.toBlob(res,'image/jpeg',.88));
+}
+// Small copies (under 512px) of the product photos: the free Cloudflare model needs them that small.
+const refCache={};
+async function refImages(ids){
+  const out=[];
+  for(const id of ids){
+    if(!refCache[id]){
+      const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
+      const s=Math.min(1,500/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(im.naturalWidth*s);c.height=Math.round(im.naturalHeight*s);
+      const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);
+      refCache[id]=(await api('/api/landing/image',null,await new Promise(r=>c.toBlob(r,'image/jpeg',.9)))).id;
+    }
+    out.push(refCache[id]);
+  }
+  return out;
 }
 async function upload(files){const ids=[];for(const f of files){const blob=await shrink(f);ids.push((await api('/api/landing/image',null,blob)).id)}return ids}
 
@@ -177,7 +192,8 @@ $('wGo').onclick=async()=>{
       // Two at a time: faster, without hitting Gemini's rate limit.
       const prompts=copy.image_prompts.slice(0,count),got=new Array(prompts.length);let next=0,done=0;
       steps(list,1);const li=$('wSteps').children[1],label=li.textContent;
-      const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:prompts[i]})).id}catch(x){imgErrs.add(errOf(x));say('تصويرة '+(i+1)+': '+errOf(x),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
+      const refs=await refImages(wImages.slice(0,3)).catch(()=>wImages.slice(0,3));
+      const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:refs,prompt:prompts[i]})).id}catch(x){imgErrs.add(errOf(x));say('تصويرة '+(i+1)+': '+errOf(x),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
       await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);caps[id]={t:copy.image_captions?.[i]||'',s:copy.image_subcaptions?.[i]||''}}});
     }
     const aiPhotos=scenes.length;
@@ -231,7 +247,7 @@ $('genScene').onclick=async()=>{
   const prompt=$('scenePrompt').value.trim()||cur._prompts?.[cur.scene_images.length%(cur._prompts.length||1)]||'the product in use in a bright modern Moroccan home';
   if(!cur.images.length)return say('زيد تصويرة ديال المنتج الأول.',true);
   $('genScene').disabled=true;say('⏳ كنولد التصويرة... (حتى دقيقة)');
-  try{cur.scene_images.push((await api('/api/landing/ai-image',{images:cur.images.slice(0,3),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errOf(x),true)}
+  try{cur.scene_images.push((await api('/api/landing/ai-image',{images:await refImages(cur.images.slice(0,3)),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errOf(x),true)}
   $('genScene').disabled=false;
 };
 // Posters as PNG files, same style as the page: big dark title, colored ribbon, rounded photo.
