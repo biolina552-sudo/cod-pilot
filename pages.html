@@ -116,15 +116,17 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
 <script>
 const $=id=>document.getElementById(id);
 const STATUS={new:'🆕 جديد',confirmed:'✅ مؤكد',shipped:'🚚 مشحون',delivered:'📦 توصل',cancelled:'❌ ملغي',returned:'↩️ رجع'};
-const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDEN:'الطلب ممنوع. عاود حمّل الصفحة.',INVALID_SLUG:'الرابط خاصو يكون بحروف لاتينية صغار وأرقام و - (3 حتى 40 حرف).',SLUG_TAKEN:'هاد الرابط مستعمل. بدلو.',INVALID_PRODUCT:'دخل سمية المنتج.',INVALID_PRICE:'دخل الثمن.',INVALID_META_PIXEL:'Facebook Pixel ID خاصو يكون غير أرقام.',INVALID_TIKTOK_PIXEL:'TikTok Pixel ID ماشي صحيح.',INVALID_WHATSAPP:'رقم WhatsApp ماشي صحيح.',IMAGE_TOO_LARGE:'التصويرة كبيرة بزاف.',INVALID_IMAGE:'هاد الملف ماشي تصويرة (JPG/PNG/WEBP).',AI_NOT_CONFIGURED:'الذكاء الاصطناعي ماشي مفعّل (GEMINI_API_KEY و VOICE_OWNER_ID).',GEMINI_AUTH_FAILED:'مفتاح Gemini ماخدامش.',GEMINI_RATE_LIMITED:'Gemini عيا شوية. تسنى دقيقة وعاود.',AI_CONTENT_BLOCKED:'Gemini رفض هاد الطلب. جرب تصاور أخرى.',AI_NO_IMAGE:'Gemini ماعطاش تصويرة. عاود جرب.',AI_MODEL_UNAVAILABLE:'موديل Gemini ماشي متوفر فالحساب ديالك.',AI_IMAGE_NEEDS_BILLING:'توليد التصاور فـ Gemini خاصو تفعّل الفوترة (Billing) فـ Google AI Studio. النص خدام عادي.',AI_TIMEOUT:'Gemini طول بزاف. عاود جرب.',INVALID_AI_RESPONSE:'جواب Gemini ماكانش واضح. عاود جرب.',INVALID_IMAGES:'التصاور ماشي صالحين. عاود زيدهم.'};
+const ERR={UNAUTHENTICATED:'خاصك تدخل للحساب ديالك.',FORBIDDEN:'الطلب ممنوع. عاود حمّل الصفحة.',INVALID_SLUG:'الرابط خاصو يكون بحروف لاتينية صغار وأرقام و - (3 حتى 40 حرف).',SLUG_TAKEN:'هاد الرابط مستعمل. بدلو.',INVALID_PRODUCT:'دخل سمية المنتج.',INVALID_PRICE:'دخل الثمن.',INVALID_META_PIXEL:'Facebook Pixel ID خاصو يكون غير أرقام.',INVALID_TIKTOK_PIXEL:'TikTok Pixel ID ماشي صحيح.',INVALID_WHATSAPP:'رقم WhatsApp ماشي صحيح.',IMAGE_TOO_LARGE:'التصويرة كبيرة بزاف.',INVALID_IMAGE:'هاد الملف ماشي تصويرة (JPG/PNG/WEBP).',AI_NOT_CONFIGURED:'الذكاء الاصطناعي ماشي مفعّل (GEMINI_API_KEY و VOICE_OWNER_ID).',GEMINI_AUTH_FAILED:'مفتاح Gemini ماخدامش.',GEMINI_RATE_LIMITED:'Gemini عيا شوية. تسنى دقيقة وعاود.',AI_CONTENT_BLOCKED:'Gemini رفض هاد الطلب. جرب تصاور أخرى.',AI_NO_IMAGE:'Gemini ماعطاش تصويرة. عاود جرب.',AI_MODEL_UNAVAILABLE:'موديل Gemini ماشي متوفر فالحساب ديالك.',AI_IMAGE_NEEDS_BILLING:'توليد التصاور فـ Gemini خاصو تفعّل الفوترة (Billing) فـ Google AI Studio. النص خدام عادي.',AI_TIMEOUT:'Gemini طول بزاف. عاود جرب.',AI_BUSY:'Gemini عامر دابا. تسنى شوية وعاود جرب.',GENERATION_FAILED:'Gemini ماقدرش يصاوب هادشي.',INVALID_AI_RESPONSE:'جواب Gemini ماكانش واضح. عاود جرب.',INVALID_IMAGES:'التصاور ماشي صالحين. عاود زيدهم.'};
 const say=(t,bad)=>{const m=$('msg');m.textContent=t||'';m.classList.toggle('err',!!bad);if(t)m.scrollIntoView({block:'nearest'})};
 const errText=e=>ERR[e]||('وقع مشكل: '+e);
+// Adds Gemini's own reason (owner-only) so a failure can be sent to support as is.
+const errOf=x=>errText(x.message)+(x.detail?' ['+x.detail+']':'');
 let shop='',ai=false,pages=[],cur=null,wImages=[],niches=[];
 
 async function api(path,body,raw){
   const opt=body===undefined?{}:{method:'POST',headers:{'content-type':raw?raw.type:'application/json'},body:raw?raw:JSON.stringify(body)};
   let r,d;try{r=await fetch(path,opt);d=await r.json()}catch{throw Error('NETWORK')}
-  if(!r.ok||d.success===false)throw Error(d.error||'HTTP_'+r.status);return d;
+  if(!r.ok||d.success===false)throw Object.assign(Error(d.error||'HTTP_'+r.status),{detail:d.detail});return d;
 }
 const img=id=>shop?shop+'/img/'+id:'';
 
@@ -154,7 +156,7 @@ function thumbs(el,ids,opts={}){
 // ---------- AI wizard ----------
 $('wFiles').onchange=async e=>{
   const files=[...e.target.files].slice(0,4-wImages.length);e.target.value='';if(!files.length)return;
-  say('كنرفع التصاور...');try{wImages.push(...await upload(files));say('')}catch(x){say(errText(x.message),true)}
+  say('كنرفع التصاور...');try{wImages.push(...await upload(files));say('')}catch(x){say(errOf(x),true)}
   drawW();
 };
 function drawW(){thumbs($('wThumbs'),wImages,{redraw:drawW})}
@@ -175,17 +177,26 @@ $('wGo').onclick=async()=>{
       // Two at a time: faster, without hitting Gemini's rate limit.
       const prompts=copy.image_prompts.slice(0,count),got=new Array(prompts.length);let next=0,done=0;
       steps(list,1);const li=$('wSteps').children[1],label=li.textContent;
-      const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:prompts[i]})).id}catch(x){imgErrs.add(errText(x.message));say('تصويرة '+(i+1)+': '+errText(x.message),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
+      const worker=async()=>{while(next<prompts.length){const i=next++;try{got[i]=(await api('/api/landing/ai-image',{images:wImages.slice(0,3),prompt:prompts[i]})).id}catch(x){imgErrs.add(errOf(x));say('تصويرة '+(i+1)+': '+errOf(x),true)}li.textContent=label+' · '+(++done)+'/'+prompts.length}};
       await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);caps[id]={t:copy.image_captions?.[i]||'',s:copy.image_subcaptions?.[i]||''}}});
+    }
+    const aiPhotos=scenes.length;
+    if(!aiPhotos){
+      // No AI photos (none asked, or Gemini failed): build designed posters from code instead.
+      say('⏳ كنصاوب بوسترات مصممة من التصاور ديالك...');
+      const nc=(niches.find(n=>n.id===niche)||{}).color||copy.color||'#196c58';
+      scenes.push(...await codePosters(copy,wImages,/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58',lang,niche));
     }
     steps(list,list.length-1);
     const old=parseFloat($('wOld').value);
     openEditor({...copy,niche,color:(niches.find(n=>n.id===niche)||{}).color||copy.color,lang,currency:$('wCurrency').value,offers:suggestOffers(price),old_price:old>price?old:null,images:[...wImages],scene_images:scenes,scene_captions:caps,published:true,ask_address:false,_prompts:copy.image_prompts});
     steps(list,list.length);
     // Keep image errors visible: otherwise the success message hides why photos are missing.
-    if(count&&!scenes.length)say('⚠️ النص واجد، ولكن التصاور الاحترافية ماتولداتش: '+[...imgErrs].join(' / '),true);
+    const why=count&&!aiPhotos?'⚠️ تصاور Gemini ماتولداتش'+(imgErrs.size?' ('+[...imgErrs].join(' / ')+')':'')+'. ':'';
+    if(!scenes.length)say(why+'⚠️ ماقدرتش نصاوب حتى بوستر من التصاور ديالك. النص واجد: زيد تصاور ولا عاود جرب، ومن بعد "حفظ ونشر".',true);
+    else if(why)say(why+'عوضتهم بـ '+scenes.length+' بوسترات مصممة من التصاور ديالك. راجع الصفحة ومن بعد كليكي "حفظ ونشر".',true);
     else say('✔ الصفحة واجدة'+(imgErrs.size?' (شي تصاور ماتولداتش: '+[...imgErrs].join(' / ')+')':'')+'. راجع النص والتصاور، ومن بعد كليكي "حفظ ونشر".');
-  }catch(x){say(errText(x.message),true)}
+  }catch(x){say(errOf(x),true)}
   $('wGo').disabled=false;
 };
 
@@ -215,18 +226,18 @@ function drawImages(){
   thumbs($('images'),cur.images,{redraw:drawImages,redrawAll:drawImages,move:{label:'↓',title:'رد لتحت',to:cur.scene_images}});
   thumbs($('scenes'),cur.scene_images,{redraw:drawImages,redrawAll:drawImages,move:{label:'↑',title:'طلع للفوق',to:cur.images},captions:cur.scene_captions});
 }
-$('moreImages').onchange=async e=>{const files=[...e.target.files];e.target.value='';say('كنرفع التصاور...');try{cur.images.push(...await upload(files));say('')}catch(x){say(errText(x.message),true)}drawImages()};
+$('moreImages').onchange=async e=>{const files=[...e.target.files];e.target.value='';say('كنرفع التصاور...');try{cur.images.push(...await upload(files));say('')}catch(x){say(errOf(x),true)}drawImages()};
 $('genScene').onclick=async()=>{
   const prompt=$('scenePrompt').value.trim()||cur._prompts?.[cur.scene_images.length%(cur._prompts.length||1)]||'the product in use in a bright modern Moroccan home';
   if(!cur.images.length)return say('زيد تصويرة ديال المنتج الأول.',true);
   $('genScene').disabled=true;say('⏳ كنولد التصويرة... (حتى دقيقة)');
-  try{cur.scene_images.push((await api('/api/landing/ai-image',{images:cur.images.slice(0,3),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errText(x.message),true)}
+  try{cur.scene_images.push((await api('/api/landing/ai-image',{images:cur.images.slice(0,3),prompt})).id);drawImages();say('✔ تزادت التصويرة.')}catch(x){say(errOf(x),true)}
   $('genScene').disabled=false;
 };
 // Posters as PNG files, same style as the page: big dark title, colored ribbon, rounded photo.
 const NICHE_RIBBON={general:['#f2a33a','#fff'],kitchen:['#f39c12','#fff'],health:['#22b8a6','#fff'],beauty:['#f06292','#fff'],home:['#f5b700','#1f1f1f'],kids:['#ff8a3d','#fff'],sport:['#212121','#fff'],tech:['#00a8e8','#fff'],car:['#ff6f00','#fff'],fashion:['#c9a227','#1f1f1f'],pets:['#43a047','#fff']};
 function darker(hex,k=.72){const n=parseInt(hex.slice(1),16);return 'rgb('+[n>>16,n>>8&255,n&255].map(v=>Math.round(v*k)).join(',')+')'}
-async function posterPng(id,cap,color,rtl,niche){
+async function posterPng(id,cap,color,rtl,niche,type='image/png'){
   await Promise.all([document.fonts.load('900 76px Cairo'),document.fonts.load('800 44px Cairo')]);
   const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
   const W=1080,P=40,x=document.createElement('canvas').getContext('2d');
@@ -241,7 +252,41 @@ async function posterPng(id,cap,color,rtl,niche){
   if(sl.length){g.font=S;const y0=60+tl.length*100+20,bw=Math.max(...sl.map(l=>g.measureText(l).width))+80,bh=sl.length*62+16;
     g.save();g.translate(W/2,y0+bh/2);g.rotate(-.025);g.fillStyle=rb;g.beginPath();g.roundRect(-bw/2,-bh/2,bw,bh,bh/2);g.fill();g.fillStyle=rt;sl.forEach((l,i)=>g.fillText(l,0,-bh/2+8+31+i*62));g.restore()}
   g.save();g.beginPath();g.roundRect(P,top,iw,ih,36);g.clip();g.drawImage(im,P,top,iw,ih);g.restore();
-  return await new Promise(r=>c.toBlob(r,'image/png'));
+  return await new Promise(r=>c.toBlob(r,type,.9));
+}
+// A list poster drawn from code: dark title, small product photo, then rows of icon + text.
+async function listPng(id,title,rows,color,rtl){
+  await Promise.all([document.fonts.load('900 70px Cairo'),document.fonts.load('700 42px Cairo')]);
+  const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
+  const W=1080,P=60,x=document.createElement('canvas').getContext('2d');
+  const wrap=(text,font,max)=>{x.font=font;const out=[];let line='';for(const w of String(text||'').split(/\s+/).filter(Boolean)){const t=line?line+' '+w:w;if(x.measureText(t).width>max&&line){out.push(line);line=w}else line=t}if(line)out.push(line);return out};
+  const T="900 70px Cairo",R="700 42px Cairo",tl=wrap(title,T,W-2*P),items=rows.map(([icon,text])=>[icon,wrap(text,R,W-2*P-150)]);
+  const ph=480,top=70+tl.length*92+30,rowsH=items.reduce((h,[,l])=>h+Math.max(110,l.length*58+40),0),c=x.canvas;c.width=W;c.height=top+ph+50+rowsH+50;
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,c.height);
+  g.globalAlpha=.1;g.fillStyle=color;g.beginPath();g.ellipse(W/2,c.height+80,W*.8,280,0,0,7);g.fill();g.globalAlpha=1;
+  g.textAlign='center';g.textBaseline='middle';g.direction=rtl?'rtl':'ltr';g.fillStyle=darker(color);g.font=T;tl.forEach((l,i)=>g.fillText(l,W/2,70+46+i*92));
+  const iw=Math.round(im.naturalWidth*ph/im.naturalHeight),pw=Math.min(W-2*P,iw);g.save();g.beginPath();g.roundRect((W-pw)/2,top,pw,ph,36);g.clip();g.drawImage(im,(W-iw)/2,top,iw,ph);g.restore();
+  let y=top+ph+50;const ix=rtl?W-P-50:P+50,tx=rtl?W-P-130:P+130;
+  for(const [icon,lines] of items){const h=Math.max(110,lines.length*58+40);
+    g.fillStyle=color;g.globalAlpha=.12;g.beginPath();g.roundRect(P-10,y,W-2*P+20,h-16,28);g.fill();g.globalAlpha=1;
+    g.font='54px sans-serif';g.textAlign='center';g.fillText(icon,ix,y+(h-16)/2);
+    g.font=R;g.fillStyle='#1f2a26';g.textAlign=rtl?'right':'left';lines.forEach((l,i)=>g.fillText(l,tx,y+(h-16)/2-(lines.length-1)*29+i*58));
+    y+=h}
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.9));
+}
+// Without AI photos, the wizard still fills the page with posters built from the seller's own photos.
+async function codePosters(copy,photos,color,lang,niche){
+  const rtl=lang==='ar';
+  const caps=copy.image_captions||[],subs=copy.image_subcaptions||[],at=i=>photos[i%photos.length],out=[];
+  const jobs=[
+    ()=>posterPng(at(0),{t:caps[0]||copy.headline,s:subs[0]||copy.subheadline},color,rtl,niche,'image/jpeg'),
+    ()=>(copy.problems||[]).length&&listPng(at(1),copy.problem_title||copy.headline,[...copy.problems.slice(0,4).map(p=>['❌',p]),...(copy.solution?[['✅',copy.solution]]:[])],color,rtl),
+    ()=>posterPng(at(2),{t:caps[1]||copy.bullets?.[0]||'',s:subs[1]||''},color,rtl,niche,'image/jpeg'),
+    ()=>(copy.features||[]).length&&listPng(at(3),{ar:'علاش غادي يعجبك؟',fr:'Pourquoi vous allez l’adorer',en:'Why you will love it'}[lang]||'Why you will love it',copy.features.slice(0,4).map(f=>[f.icon||'⭐',f.title+(f.text?': '+f.text:'')]),color,rtl),
+    ()=>posterPng(at(4),{t:caps[2]||copy.bullets?.[1]||'',s:subs[2]||''},color,rtl,niche,'image/jpeg')
+  ];
+  for(const job of jobs){try{const blob=await job();if(blob)out.push((await api('/api/landing/image',null,blob)).id)}catch(x){console.warn('poster',x)}}
+  return out;
 }
 $('dlPosters').onclick=async()=>{
   const list=[...(cur.images[0]?[[cur.images[0],{t:$('headline').value||$('product').value,s:$('subheadline').value}]]:[]),...cur.scene_images.map(id=>[id,cur.scene_captions[id]||{}])];
@@ -264,12 +309,12 @@ $('save').onclick=async()=>{
     $('savedLink').innerHTML=!d.page.published?'<p>✔ تحفظات (ماشي منشورة).</p>':!d.url?'<p>✔ منشورة، ولكن الرابط العمومي (SHOP_ORIGIN) ماشي مضبوط.</p>':`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button><a class="btn light" id="dlLink">⬇ تنزيل HTML</a></p><p class="hint">ملف HTML تقدر تحطو فـ Shopify ولا YouCan ولا أي موقع. الطلبات غادي توصلك هنا ديما، والصفحة خاصها تبقى منشورة.</p>`;
     if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('dlLink').href='/api/landing/export?id='+d.page.id;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
     say('✔ تحفظات.');wImages=[];drawW();$('wSteps').hidden=true;await loadPages();
-  }catch(x){say(errText(x.message),true)}
+  }catch(x){say(errOf(x),true)}
   $('save').disabled=false;
 };
 
 async function loadPages(){
-  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errText(x.message),true);return}
+  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errOf(x),true);return}
   const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
   if(!shop)say('رابط الصفحات العمومية (SHOP_ORIGIN) ماشي مضبوط، فالروابط مازال مايبانوش.',true);
   for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug,live=p.published&&!!shop;
@@ -278,7 +323,7 @@ async function loadPages(){
     d.querySelector('b').textContent=p.product;d.querySelector('.u').textContent='/'+p.slug;
     d.querySelector('.e').onclick=()=>openEditor(p);
     if(live){d.querySelector('.o').href=url;d.querySelector('.d').href='/api/landing/export?id='+p.id;d.querySelector('.d').title='تنزيل الصفحة كملف HTML لموقع آخر';d.querySelector('.c').onclick=()=>navigator.clipboard.writeText(url).then(()=>say('✔ تنسخ الرابط.'))}
-    d.querySelector('.x').onclick=async()=>{if(!confirm('نحذفو الصفحة "'+p.product+'"؟ الطلبات القديمة غادي يبقاو.'))return;try{await api('/api/landing/delete',{id:p.id});say('✔ تحذفات.');loadPages()}catch(x){say(errText(x.message),true)}};
+    d.querySelector('.x').onclick=async()=>{if(!confirm('نحذفو الصفحة "'+p.product+'"؟ الطلبات القديمة غادي يبقاو.'))return;try{await api('/api/landing/delete',{id:p.id});say('✔ تحذفات.');loadPages()}catch(x){say(errOf(x),true)}};
     el.append(d)}
   const f=$('fPage'),v=f.value;f.innerHTML='<option value="">الكل</option>'+pages.map(p=>`<option></option>`).join('');[...f.options].slice(1).forEach((o,i)=>{o.value=pages[i].id;o.textContent=pages[i].product});f.value=v;
 }
@@ -302,11 +347,11 @@ function drawOrders(){
     c[3].textContent=o.name;const tel=tr.querySelector('.tel');tel.textContent=o.phone;tel.href='tel:'+o.phone;tr.querySelector('.wa').href='https://wa.me/'+waNumber(o.phone);
     c[5].textContent=o.city+(o.address?' — '+o.address:'');
     const sel=tr.querySelector('select');Object.entries(STATUS).forEach(([k,v])=>sel.append(new Option(v,k)));sel.value=o.status;
-    sel.onchange=async()=>{sel.disabled=true;try{const d=await api('/api/orders/status',{id:o.id,status:sel.value});Object.assign(o,d.order);drawOrders()}catch(x){say(errText(x.message),true);sel.value=o.status}sel.disabled=false};
+    sel.onchange=async()=>{sel.disabled=true;try{const d=await api('/api/orders/status',{id:o.id,status:sel.value});Object.assign(o,d.order);drawOrders()}catch(x){say(errOf(x),true);sel.value=o.status}sel.disabled=false};
     tb.append(tr)}
 }
 async function loadOrders(more){
-  try{const d=await api('/api/orders'+(more&&cursor?'?cursor='+encodeURIComponent(cursor):''));orders=more?orders.concat(d.items):d.items;cursor=d.cursor;$('moreWrap').hidden=!cursor;drawOrders()}catch(x){say(errText(x.message),true)}
+  try{const d=await api('/api/orders'+(more&&cursor?'?cursor='+encodeURIComponent(cursor):''));orders=more?orders.concat(d.items):d.items;cursor=d.cursor;$('moreWrap').hidden=!cursor;drawOrders()}catch(x){say(errOf(x),true)}
 }
 $('fStatus').onchange=$('fPage').onchange=drawOrders;$('refresh').onclick=()=>loadOrders();$('more').onclick=()=>loadOrders(true);
 $('csv').onclick=()=>{

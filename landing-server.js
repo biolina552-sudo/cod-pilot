@@ -2,7 +2,7 @@
 // Public pages are served by the separate shop worker (shop/entry.js).
 const LP_IMAGE_TYPES={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'};
 const LP_IMAGE_LIMIT=5*1024*1024;
-const LP_TEXT_MODEL='gemini-3.6-flash',LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-3.1-flash-image-preview','gemini-2.5-flash-image','gemini-nano-banana-2.1'];
+const LP_TEXT_MODELS=['gemini-3.6-flash','gemini-3.8-flash','gemini-2.5-flash'],LP_IMAGE_MODELS=['gemini-3.1-flash-image','gemini-3.1-flash-image-preview','gemini-2.5-flash-image','gemini-nano-banana-2.1'];
 const lpHex=n=>[...crypto.getRandomValues(new Uint8Array(n))].map(b=>b.toString(16).padStart(2,'0')).join('');
 function lpB64(bytes){let s='';for(let i=0;i<bytes.length;i+=0x8000)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));return btoa(s)}
 function lpSniff(b){
@@ -27,12 +27,28 @@ async function lpImageParts(env,user,ids){
   }
   return parts;
 }
+// Gemini is often briefly overloaded: wait and try again before giving up.
+async function lpGeminiRetry(env,model,body){
+  for(let i=0;;i++){try{return await lpGemini(env,model,body)}catch(e){if(e.code!=='AI_BUSY'||i>=2)throw e;await new Promise(r=>setTimeout(r,2000*(i+1)))}}
+}
+// Tries each model (and each request variant) in turn; errors about the key, quota or content stop at once.
+// usable(parts) can reject an answer that came back empty (e.g. no image) so the next try runs.
+async function lpGeminiFirst(env,models,variants,usable=()=>true){
+  let last;
+  for(const model of models)for(const body of variants(model)){
+    try{const out=await lpGeminiRetry(env,model,body);if(usable(out))return out;last=Object.assign(Error('empty'),{code:'AI_NO_IMAGE',detail:model+': no image in the answer'})}
+    catch(e){last=e;if(!['AI_MODEL_UNAVAILABLE','AI_BUSY','GENERATION_FAILED'].includes(e.code))throw e}
+  }
+  throw last;
+}
 async function lpGemini(env,model,body){
   const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GEMINI_API_KEY.trim()},body:JSON.stringify(body),redirect:'manual',signal:AbortSignal.timeout(110000)});
   if(!r.ok){
     const msg=(await r.text()).split(env.GEMINI_API_KEY.trim()).join('[REDACTED]').slice(0,300);
     console.error('LANDING_AI',model,r.status,msg);
-    throw Object.assign(Error('provider'),{code:r.status===429?(/limit: 0\b|free_tier/i.test(msg)?'AI_IMAGE_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
+    const busy=[500,502,503,504].includes(r.status)||/overloaded|UNAVAILABLE/.test(msg);
+    // detail is shown to the app owner only (AI routes are owner-only) so a failure can be diagnosed.
+    throw Object.assign(Error('provider'),{status:r.status,detail:model+' '+r.status+': '+msg.replace(/\s+/g,' ').slice(0,200),code:busy?'AI_BUSY':r.status===429?(/limit: 0\b|free_tier/i.test(msg)?'AI_IMAGE_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
   }
   const d=await r.json();
   if(d.promptFeedback?.blockReason)throw Object.assign(Error('blocked'),{code:'AI_CONTENT_BLOCKED'});
@@ -161,7 +177,9 @@ async function handleLanding(request,env,user,u){
       const lang=['ar','fr','en'].includes(b.lang)?b.lang:'ar';
       const parts=await lpImageParts(env,user,b.images);if(!parts)return json({success:false,error:'INVALID_IMAGES'},400);
       const product=typeof b.product==='string'?b.product.slice(0,120).replace(/["\n]/g,' '):'',notes=typeof b.notes==='string'?b.notes.slice(0,1000):'';
-      const out=await lpGemini(env,LP_TEXT_MODEL,{contents:[{parts:[...parts,{text:lpCopyPrompt(lang,product,notes,b.niche)}]}],generationConfig:{thinkingConfig:{thinkingLevel:'low'},responseMimeType:'application/json',maxOutputTokens:6000,responseSchema:LP_COPY_SCHEMA}});
+      const contents=[{parts:[...parts,{text:lpCopyPrompt(lang,product,notes,b.niche)}]}],config={responseMimeType:'application/json',maxOutputTokens:6000,responseSchema:LP_COPY_SCHEMA};
+      // The newest model gets a thinking setting; older fallbacks may reject it, so they go without.
+      const out=await lpGeminiFirst(env,LP_TEXT_MODELS,m=>[{contents,generationConfig:m===LP_TEXT_MODELS[0]?{...config,thinkingConfig:{thinkingLevel:'low'}}:config}]);
       let copy;try{copy=JSON.parse(out.map(p=>p.text||'').join(''))}catch{return json({success:false,error:'INVALID_AI_RESPONSE'},502)}
       copy.slug=String(copy.slug||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'product';
       if(copy.slug.length<3)copy.slug+='-shop';
@@ -180,8 +198,8 @@ Scene: ${b.prompt.slice(0,600)}
 Style: high-end advertising photography, natural soft light, sharp focus on the product, realistic people and hands if any, clean uncluttered background. No text, no letters, no logos added, no watermark, no borders.`;
       const req={contents:[{parts:[...parts,{text:prompt}]}],generationConfig:{responseModalities:['IMAGE'],imageConfig:{aspectRatio:b.aspect==='4:5'?'4:5':'1:1'}}};
       // Image model names change often: fall back to the next one if a model is gone.
-      const models=await lpImageModels(env);
-      let out;for(const model of models){try{out=await lpGemini(env,model,req);break}catch(e){if(e.code!=='AI_MODEL_UNAVAILABLE'||model===models.at(-1))throw e}}
+      // Some image models want TEXT+IMAGE output and no imageConfig: try that shape too.
+      const out=await lpGeminiFirst(env,await lpImageModels(env),()=>[req,{contents:req.contents,generationConfig:{responseModalities:['TEXT','IMAGE']}}],parts=>parts.some(p=>(p.inlineData||p.inline_data)?.data));
       const img=out.map(p=>p.inlineData||p.inline_data).find(d=>d?.data);
       if(!img)return json({success:false,error:'AI_NO_IMAGE'},502);
       const bytes=Uint8Array.from(atob(img.data),c=>c.charCodeAt(0)),type=lpSniff(bytes);
@@ -207,7 +225,7 @@ Style: high-end advertising photography, natural soft light, sharp focus on the 
     }
     return json({success:false,error:'NOT_FOUND'},404);
   }catch(e){
-    if(typeof e?.code==='string')return json({success:false,error:e.code},502);
+    if(typeof e?.code==='string')return json({success:false,error:e.code,...(e.detail?{detail:e.detail}:{})},502);
     console.error('LANDING',String(e?.name),String(e?.message).slice(0,200));
     return json({success:false,error:e?.name==='TimeoutError'?'AI_TIMEOUT':'SERVER_ERROR'},500);
   }
