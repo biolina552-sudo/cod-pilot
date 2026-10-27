@@ -18,6 +18,7 @@ button.light,.btn.light{background:var(--pale);color:var(--ink)}button.danger{ba
 .rows>div{display:grid;gap:8px;grid-template-columns:60px 1fr 2fr 36px;margin:6px 0}.rows.faq>div{grid-template-columns:1fr 2fr 36px}.rows.offers>div{grid-template-columns:90px 1fr 2fr 36px}.rows input{margin:0}.rows button{padding:6px}
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;border-bottom:1px solid #eef1ee;text-align:start;vertical-align:top}th{color:var(--muted);font-weight:600}td select{padding:4px 6px;margin:0;width:auto}.tw{overflow-x:auto}
 .sum{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.sum span{background:var(--pale);border-radius:10px;padding:6px 12px;font-size:14px}
+details.more{margin:12px 0;border:1px dashed var(--line);border-radius:12px;padding:10px 14px}details.more>summary{cursor:pointer;font-weight:700}
 .hint{color:var(--muted);font-size:13px;font-weight:400}.link{direction:ltr;text-align:left;background:var(--pale);padding:8px 12px;border-radius:9px;overflow-wrap:anywhere}
 @media(max-width:640px){.rows>div,.rows.offers>div{grid-template-columns:1fr 1fr}.rows.faq>div{grid-template-columns:1fr}}
 </style>
@@ -30,24 +31,52 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     <h2>✨ صفحة جديدة بالذكاء الاصطناعي</h2>
     <label class="picker">📷 زيد تصاور المنتج (1 حتى 4)<input type="file" id="wFiles" accept="image/*" multiple></label>
     <div class="thumbs" id="wThumbs"></div>
+    <label>💰 الثمن<input id="wPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="199"></label>
+    <label>✍️ وصف المنتج <span class="hint">(شنو هو، وشنو المشكل اللي كيحل)</span><textarea id="wNotes" maxlength="1000" style="min-height:70px" placeholder="مثلا: جهاز كينعم الرجلين وكيحيد الجلد الناشف فـ 5 دقايق"></textarea></label>
+    <details class="more"><summary>⚙️ خيارات إضافية <span class="hint">(اختياري)</span></summary>
     <div class="row">
-      <label>الثمن<input id="wPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="199"></label>
-      <label>الثمن القديم <span class="hint">(اختياري)</span><input id="wOld" type="number" min="0" step="0.01" inputmode="decimal" placeholder="299"></label>
+      <label>الثمن القديم<input id="wOld" type="number" min="0" step="0.01" inputmode="decimal" placeholder="299"></label>
       <label>العملة<select id="wCurrency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
       <label>لغة الصفحة<select id="wLang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
     </div>
-    <label>القالب (النيتش) <span class="hint">(كيبدل الألوان، الأيقونات، والستيل ديال النص والتصاور)</span><select id="wNiche" class="niche"></select></label>
-    <label>سمية المنتج <span class="hint">(اختياري)</span><input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
-    <label>معلومات زايدة <span class="hint">(اختياري: المشكل اللي كيحل، شكون الزبون...)</span><textarea id="wNotes" maxlength="1000" style="min-height:60px"></textarea></label>
+    <label>القالب (النيتش)<select id="wNiche" class="niche"><option value="">🤖 تلقائي (الذكاء الاصطناعي يختار)</option></select></label>
+    <label>سمية المنتج<input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
     <label>شحال من تصويرة احترافية يولد الذكاء الاصطناعي؟<select id="wCount"><option value="0">بلا تصاور</option><option value="3">3 تصاور</option><option value="6" selected>6 تصاور</option><option value="8">8 تصاور</option></select></label>
+    </details>
     <p><button class="big" id="wGo">✨ صاوب الصفحة</button></p>
     <ol class="steps" id="wSteps" hidden></ol>
   </section>
 
   <section id="editor" hidden>
     <h2 id="edTitle">تعديل الصفحة</h2>
+    <label>سمية المنتج<input id="product" maxlength="120"></label>
+    <h3>العروض <span class="hint">(الأول هو الثمن الأساسي)</span></h3>
+    <div class="rows offers" id="offers"></div><button class="light" id="addOffer">+ عرض</button>
+
+    <h3>تصاور المنتج <span class="hint">(فوق فالصفحة)</span></h3>
+    <div class="thumbs" id="images"></div>
+    <label class="picker">+ زيد تصاور<input type="file" id="moreImages" accept="image/*" multiple></label>
+    <h3>تصاور احترافية <span class="hint">(بين الأقسام)</span></h3>
+    <div class="thumbs" id="scenes"></div>
+    <details class="more"><summary>✏️ بدل النص <span class="hint">(اختياري: الذكاء الاصطناعي كتبو)</span></summary>
+    <label>العنوان الكبير<input id="headline" maxlength="160"></label>
+    <label>الجملة تحت العنوان<input id="subheadline" maxlength="300"></label>
+    <label>عنوان قسم المشكل<input id="problem_title" maxlength="160"></label>
+    <label>المشاكل <span class="hint">(كل سطر مشكل)</span><textarea id="problems"></textarea></label>
+    <label>الحل<textarea id="solution" maxlength="500" style="min-height:60px"></textarea></label>
+    <label>عنوان قسم النتيجة<input id="results_title" maxlength="160" placeholder="شنو غادي تربح؟"></label>
+    <label>النتائج <span class="hint">(كل سطر نتيجة كيحس بيها الزبون)</span><textarea id="results"></textarea></label>
+    <label>قبل / بعد <span class="hint">(كل سطر: قبل | بعد)</span><textarea id="before_after" placeholder="رجلين ناشفين | رجلين ناعمين فـ 5 دقايق"></textarea></label>
+    <label>المميزات <span class="hint">(كل سطر ميزة)</span><textarea id="bullets"></textarea></label>
+    <h3>علاش تختارو <span class="hint">(إيموجي · عنوان · جملة)</span></h3>
+    <div class="rows" id="features"></div><button class="light" id="addFeature">+ زيد</button>
+    <label>الوصف<textarea id="description" maxlength="3000"></textarea></label>
+    <h3>أسئلة متكررة</h3>
+    <div class="rows faq" id="faq"></div><button class="light" id="addFaq">+ سؤال</button>
+    <label>نص زر الطلب<input id="cta" maxlength="40"></label>
+    </details>
+    <details class="more"><summary>⚙️ إعدادات متقدمة <span class="hint">(اختياري)</span></summary>
     <div class="row">
-      <label>سمية المنتج<input id="product" maxlength="120"></label>
       <label>الرابط <span class="hint">(حروف لاتينية صغار و -)</span><input id="slug" maxlength="40" dir="ltr"></label>
       <label>اللغة<select id="lang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
     </div>
@@ -58,31 +87,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
       <label>اللون<input id="color" type="color" value="#196c58"></label>
       <label>الشكل<select id="layout"><option value="poster">بوسترات + أزرار "اطلب الآن" بيناتهم</option><option value="classic">كلاسيكي (الكتابة فوق التصويرة)</option></select></label>
     </div>
-    <h3>العروض <span class="hint">(الأول هو الثمن الأساسي)</span></h3>
-    <div class="rows offers" id="offers"></div><button class="light" id="addOffer">+ عرض</button>
-
-    <h3>تصاور المنتج <span class="hint">(فوق فالصفحة)</span></h3>
-    <div class="thumbs" id="images"></div>
-    <label class="picker">+ زيد تصاور<input type="file" id="moreImages" accept="image/*" multiple></label>
-    <h3>تصاور احترافية <span class="hint">(بين الأقسام)</span></h3>
-    <div class="thumbs" id="scenes"></div>
-    <p><button class="light" id="dlPosters">⬇ تنزيل البوسترات كتصاور PNG (لـ YouCan ولا Shopify)</button></p>
     <div class="row"><label>وصف تصويرة جديدة <span class="hint">(بالإنجليزية ولا بالعربية)</span><input id="scenePrompt" placeholder="the product on a kitchen table, morning light"></label><button id="genScene" style="flex:0">✨ ولد</button></div>
-
-    <h3>النص</h3>
-    <label>العنوان الكبير<input id="headline" maxlength="160"></label>
-    <label>الجملة تحت العنوان<input id="subheadline" maxlength="300"></label>
-    <label>عنوان قسم المشكل<input id="problem_title" maxlength="160"></label>
-    <label>المشاكل <span class="hint">(كل سطر مشكل)</span><textarea id="problems"></textarea></label>
-    <label>الحل<textarea id="solution" maxlength="500" style="min-height:60px"></textarea></label>
-    <label>المميزات <span class="hint">(كل سطر ميزة)</span><textarea id="bullets"></textarea></label>
-    <h3>علاش تختارو <span class="hint">(إيموجي · عنوان · جملة)</span></h3>
-    <div class="rows" id="features"></div><button class="light" id="addFeature">+ زيد</button>
-    <label>الوصف<textarea id="description" maxlength="3000"></textarea></label>
-    <h3>أسئلة متكررة</h3>
-    <div class="rows faq" id="faq"></div><button class="light" id="addFaq">+ سؤال</button>
-    <label>نص زر الطلب<input id="cta" maxlength="40"></label>
-
+    <p><button class="light" id="dlPosters">⬇ تنزيل البوسترات كتصاور PNG (لـ YouCan ولا Shopify)</button></p>
     <h3>الطلب والتتبع</h3>
     <label><input type="checkbox" id="ask_address"> طلب العنوان الكامل من الزبون</label>
     <div class="row">
@@ -92,6 +98,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     </div>
     <label>رسالة الشكر <span class="hint">(اختياري)</span><input id="thanks" maxlength="300"></label>
     <label><input type="checkbox" id="published" checked> منشورة (الناس يقدرو يشوفوها)</label>
+    </details>
     <p class="row"><button class="big" id="save">💾 حفظ ونشر</button><button class="light" id="cancel" style="flex:0">إلغاء</button></p>
     <div id="savedLink"></div>
   </section>
@@ -181,12 +188,15 @@ $('wGo').onclick=async()=>{
   const price=parseFloat($('wPrice').value);
   if(!wImages.length)return say('زيد على الأقل تصويرة وحدة ديال المنتج.',true);
   if(!(price>0))return say('دخل الثمن.',true);
+  if($('wNotes').value.trim().length<3&&!$('wProduct').value.trim())return say('كتب وصف قصير ديال المنتج: شنو هو وشنو كيحل.',true);
   if(!ai)return say(errText('AI_NOT_CONFIGURED'),true);
   const lang=$('wLang').value,count=+$('wCount').value;
   const list=['كنحلل التصاور ونكتب النص (المشكل، الحل، المميزات...)',...(count?['كنولد '+count+' تصاور احترافية (كل وحدة كتاخد شي نص دقيقة)']:[]),'الصفحة واجدة للمراجعة'];
   $('wGo').disabled=true;say('');steps(list,0);
   try{
-    const niche=$('wNiche').value,{copy}=await api('/api/landing/ai-copy',{images:wImages,lang,niche,product:$('wProduct').value,notes:$('wNotes').value});
+    const {copy}=await api('/api/landing/ai-copy',{images:wImages,lang,niche:$('wNiche').value,product:$('wProduct').value,notes:$('wNotes').value});
+    // "Automatic" template: the AI picked one from the photos.
+    const niche=$('wNiche').value||(niches.some(n=>n.id===copy.niche)?copy.niche:'general');
     const scenes=[],caps={},imgErrs=new Set();
     if(count){
       // Two at a time: faster, without hitting Gemini's rate limit.
@@ -197,6 +207,11 @@ $('wGo').onclick=async()=>{
       await Promise.all([worker(),worker()]);got.forEach((id,i)=>{if(id){scenes.push(id);caps[id]={t:copy.image_captions?.[i]||'',s:copy.image_subcaptions?.[i]||''}}});
     }
     const aiPhotos=scenes.length;
+    if(aiPhotos&&(copy.before_after||[]).length){
+      // AI photos show the result; the before/after poster spells it out.
+      const nc=(niches.find(n=>n.id===niche)||{}).color||copy.color||'#196c58';
+      const id=await upPoster(()=>baPng(wImages[0],copy.before_after,/^#[0-9a-f]{6}$/i.test(nc)?nc:'#196c58',lang));if(id)scenes.splice(Math.min(2,scenes.length),0,id);
+    }
     if(!aiPhotos){
       // No AI photos (none asked, or Gemini failed): build designed posters from code instead.
       say('⏳ كنصاوب بوسترات مصممة من التصاور ديالك...');
@@ -223,7 +238,7 @@ function rowList(el,items,fields,blank){
     const rm=document.createElement('button');rm.className='danger';rm.textContent='✕';rm.title='حيد';rm.onclick=()=>{items.splice(i,1);draw()};d.append(rm);el.append(d)})};
   draw();return ()=>{items.push({...blank});draw()};
 }
-const TEXT=['product','slug','headline','subheadline','problem_title','solution','description','cta','whatsapp','meta_pixel','tiktok_pixel','thanks'];
+const TEXT=['product','slug','headline','subheadline','problem_title','solution','results_title','description','cta','whatsapp','meta_pixel','tiktok_pixel','thanks'];
 function openEditor(p){
   cur={features:[],faq:[],offers:[{qty:1,price:0,label:''}],images:[],scene_images:[],...structuredClone(p)};cur.scene_captions=cur.scene_captions||{};
   cur.features=cur.features||[];cur.faq=cur.faq||[];
@@ -231,6 +246,7 @@ function openEditor(p){
   TEXT.forEach(k=>$(k).value=cur[k]??'');
   $('lang').value=cur.lang||'ar';$('currency').value=cur.currency||'MAD';$('color').value=cur.color&&/^#[0-9a-f]{6}$/i.test(cur.color)?cur.color:'#196c58';
   $('old_price').value=cur.old_price??'';$('problems').value=(cur.problems||[]).join('\n');$('bullets').value=(cur.bullets||[]).join('\n');
+  $('results').value=(cur.results||[]).join('\n');$('before_after').value=(cur.before_after||[]).map(x=>x.before+' | '+x.after).join('\n');
   $('niche').value=niches.some(n=>n.id===cur.niche)?cur.niche:'general';
   $('layout').value=cur.layout==='classic'?'classic':'poster';$('ask_address').checked=!!cur.ask_address;$('published').checked=cur.published!==false;
   $('addOffer').onclick=rowList($('offers'),cur.offers,[{k:'qty',p:'الكمية',type:'number'},{k:'price',p:'الثمن',type:'number'},{k:'label',p:'الاسم (مثلا: 2 حبات + توصيل فابور)',max:60}],{qty:2,price:'',label:''});
@@ -290,6 +306,32 @@ async function listPng(id,title,rows,color,rtl){
     y+=h}
   return await new Promise(r=>c.toBlob(r,'image/jpeg',.9));
 }
+// Before/after poster: the customer's problem today next to the result they get.
+const BA_WORDS={ar:['قبل','بعد','الفرق اللي غادي تحس بيه'],fr:['Avant','Après','La différence que vous allez sentir'],en:['Before','After','The difference you will feel']};
+async function baPng(id,pairs,color,lang){
+  const rtl=lang==='ar',[wb,wa,title]=BA_WORDS[lang]||BA_WORDS.en;
+  await Promise.all([document.fonts.load('900 66px Cairo'),document.fonts.load('800 40px Cairo')]);
+  const im=new Image();im.crossOrigin='anonymous';im.src=img(id);await im.decode();
+  const W=1080,P=50,G=24,cw=(W-2*P-G)/2,x=document.createElement('canvas').getContext('2d');
+  const wrap=(text,font,max)=>{x.font=font;const out=[];let line='';for(const w of String(text||'').split(/\s+/).filter(Boolean)){const t=line?line+' '+w:w;if(x.measureText(t).width>max&&line){out.push(line);line=w}else line=t}if(line)out.push(line);return out};
+  const T="900 66px Cairo",R="800 40px Cairo",tl=wrap(title,T,W-2*P);
+  const rows=pairs.slice(0,4).map(p=>[wrap('❌ '+p.before,R,cw-50),wrap('✅ '+p.after,R,cw-50)]).map(([b,a])=>[b,a,Math.max(b.length,a.length)*54+50]);
+  const ph=420,top=60+tl.length*86+24,head=top+ph+40,c=x.canvas;c.width=W;c.height=head+90+rows.reduce((h,r)=>h+r[2]+G,0)+40;
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,W,c.height);
+  g.globalAlpha=.1;g.fillStyle=color;g.beginPath();g.ellipse(W/2,c.height+80,W*.8,280,0,0,7);g.fill();g.globalAlpha=1;
+  g.textAlign='center';g.textBaseline='middle';g.direction=rtl?'rtl':'ltr';g.fillStyle=darker(color);g.font=T;tl.forEach((l,i)=>g.fillText(l,W/2,60+43+i*86));
+  const iw=Math.round(im.naturalWidth*ph/im.naturalHeight),pw=Math.min(W-2*P,iw);g.save();g.beginPath();g.roundRect((W-pw)/2,top,pw,ph,36);g.clip();g.drawImage(im,(W-iw)/2,top,iw,ph);g.restore();
+  // Reading order: "before" comes first, so it sits on the right in Arabic.
+  const bx=rtl?P+cw+G:P,ax=rtl?P:P+cw+G;
+  const pill=(x0,y,w,h,r,fill)=>{g.fillStyle=fill;g.beginPath();g.roundRect(x0,y,w,h,r);g.fill()};
+  pill(bx,head,cw,70,35,'#d92d20');pill(ax,head,cw,70,35,'#12a150');g.fillStyle='#fff';g.font=T.replace('66px','44px');g.fillText(wb,bx+cw/2,head+37);g.fillText(wa,ax+cw/2,head+37);
+  let y=head+90;g.font=R;
+  for(const [b,a,h] of rows){pill(bx,y,cw,h,26,'#fff1ef');pill(ax,y,cw,h,26,'#e8f8ee');
+    g.fillStyle='#7a271a';b.forEach((l,i)=>g.fillText(l,bx+cw/2,y+h/2-(b.length-1)*27+i*54));
+    g.fillStyle='#0b5c2e';a.forEach((l,i)=>g.fillText(l,ax+cw/2,y+h/2-(a.length-1)*27+i*54));y+=h+G}
+  return await new Promise(r=>c.toBlob(r,'image/jpeg',.9));
+}
+async function upPoster(job){try{const blob=await job();return blob?(await api('/api/landing/image',null,blob)).id:null}catch(x){console.warn('poster',x);return null}}
 // Without AI photos, the wizard still fills the page with posters built from the seller's own photos.
 async function codePosters(copy,photos,color,lang,niche){
   const rtl=lang==='ar';
@@ -298,10 +340,12 @@ async function codePosters(copy,photos,color,lang,niche){
     ()=>posterPng(at(0),{t:caps[0]||copy.headline,s:subs[0]||copy.subheadline},color,rtl,niche,'image/jpeg'),
     ()=>(copy.problems||[]).length&&listPng(at(1),copy.problem_title||copy.headline,[...copy.problems.slice(0,4).map(p=>['❌',p]),...(copy.solution?[['✅',copy.solution]]:[])],color,rtl),
     ()=>posterPng(at(2),{t:caps[1]||copy.bullets?.[0]||'',s:subs[1]||''},color,rtl,niche,'image/jpeg'),
+    ()=>(copy.before_after||[]).length&&baPng(at(0),copy.before_after,color,lang),
+    ()=>(copy.results||[]).length&&listPng(at(1),copy.results_title||{ar:'شنو غادي تربح؟',fr:'Ce que vous allez gagner',en:'What you get'}[lang]||'What you get',copy.results.slice(0,4).map(r=>['✅',r]),color,rtl),
     ()=>(copy.features||[]).length&&listPng(at(3),{ar:'علاش غادي يعجبك؟',fr:'Pourquoi vous allez l’adorer',en:'Why you will love it'}[lang]||'Why you will love it',copy.features.slice(0,4).map(f=>[f.icon||'⭐',f.title+(f.text?': '+f.text:'')]),color,rtl),
     ()=>posterPng(at(4),{t:caps[2]||copy.bullets?.[1]||'',s:subs[2]||''},color,rtl,niche,'image/jpeg')
   ];
-  for(const job of jobs){try{const blob=await job();if(blob)out.push((await api('/api/landing/image',null,blob)).id)}catch(x){console.warn('poster',x)}}
+  for(const job of jobs){const id=await upPoster(job);if(id)out.push(id)}
   return out;
 }
 $('dlPosters').onclick=async()=>{
@@ -317,7 +361,7 @@ $('cancel').onclick=()=>{$('editor').hidden=true;cur=null};
 $('save').onclick=async()=>{
   const lines=id=>$(id).value.split('\n').map(s=>s.trim()).filter(Boolean);
   const p={...cur};TEXT.forEach(k=>p[k]=$(k).value.trim());
-  Object.assign(p,{niche:$('niche').value,layout:$('layout').value,lang:$('lang').value,currency:$('currency').value,color:$('color').value,old_price:parseFloat($('old_price').value)||null,problems:lines('problems'),bullets:lines('bullets'),ask_address:$('ask_address').checked,published:$('published').checked,slug:p.slug.toLowerCase()});
+  Object.assign(p,{niche:$('niche').value,layout:$('layout').value,lang:$('lang').value,currency:$('currency').value,color:$('color').value,old_price:parseFloat($('old_price').value)||null,problems:lines('problems'),bullets:lines('bullets'),results:lines('results'),before_after:lines('before_after').map(l=>l.split('|').map(s=>s.trim())).filter(([b,a])=>b&&a).map(([before,after])=>({before,after})),ask_address:$('ask_address').checked,published:$('published').checked,slug:p.slug.toLowerCase()});
   p.offers=cur.offers.filter(o=>o.price>0);if(!p.offers.length)return say(errText('INVALID_PRICE'),true);
   $('save').disabled=true;say('كنحفظ...');
   try{
@@ -325,12 +369,14 @@ $('save').onclick=async()=>{
     $('savedLink').innerHTML=!d.page.published?'<p>✔ تحفظات (ماشي منشورة).</p>':!d.url?'<p>✔ منشورة، ولكن الرابط العمومي (SHOP_ORIGIN) ماشي مضبوط.</p>':`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button><a class="btn light" id="dlLink">⬇ تنزيل HTML</a></p><p class="hint">ملف HTML تقدر تحطو فـ Shopify ولا YouCan ولا أي موقع. الطلبات غادي توصلك هنا ديما، والصفحة خاصها تبقى منشورة.</p>`;
     if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('dlLink').href='/api/landing/export?id='+d.page.id;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
     say('✔ تحفظات.');wImages=[];drawW();$('wSteps').hidden=true;await loadPages();
-  }catch(x){say(errOf(x),true)}
+  }catch(x){say(errOf(x),true);
+    // Fields behind the collapsed sections: open the one holding the wrong value.
+    const f={INVALID_SLUG:'slug',SLUG_TAKEN:'slug',INVALID_META_PIXEL:'meta_pixel',INVALID_TIKTOK_PIXEL:'tiktok_pixel',INVALID_WHATSAPP:'whatsapp'}[x.message];if(f){$(f).closest('details').open=true;$(f).focus()}}
   $('save').disabled=false;
 };
 
 async function loadPages(){
-  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errOf(x),true);return}
+  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML+=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errOf(x),true);return}
   const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
   if(!shop)say('رابط الصفحات العمومية (SHOP_ORIGIN) ماشي مضبوط، فالروابط مازال مايبانوش.',true);
   for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug,live=p.published&&!!shop;
