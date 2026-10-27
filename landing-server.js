@@ -104,11 +104,14 @@ const LP_COPY_SCHEMA={type:'object',properties:{
   features:{type:'array',items:{type:'object',properties:{icon:{type:'string'},title:{type:'string'},text:{type:'string'}},required:['icon','title','text']}},
   description:{type:'string'},
   faq:{type:'array',items:{type:'object',properties:{q:{type:'string'},a:{type:'string'}},required:['q','a']}},
-  cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}},image_subcaptions:{type:'array',items:{type:'string'}}
+  niche:{type:'string',enum:Object.keys(LP_NICHES)},cta:{type:'string'},color:{type:'string'},image_prompts:{type:'array',items:{type:'string'}},image_captions:{type:'array',items:{type:'string'}},image_subcaptions:{type:'array',items:{type:'string'}}
 },required:['product','slug','headline','subheadline','problem_title','problems','solution','results_title','results','before_after','bullets','features','description','faq','cta','color','image_prompts','image_captions','image_subcaptions']};
 
 function lpCopyPrompt(lang,product,notes,niche){
   const hint=Object.hasOwn(LP_NICHES,niche)?LP_NICHES[niche].hint:"";
+  // No template chosen: the model picks the niche that fits the photos.
+  const pick=hint?'':`- niche: the one store niche that fits this product best, one of: ${Object.entries(LP_NICHES).map(([id,n])=>id+' ('+(n.hint.split(':')[0]||'anything else')+')').join('; ')}.
+`;
   return `You are a senior direct-response copywriter who builds high-converting cash-on-delivery landing pages for Morocco and the Gulf.
 Look carefully at the product photos${product?` (the seller calls it: "${product}")`:''}.${notes?`\nSeller notes: ${notes}`:''}
 ${hint?`Niche: ${hint}\n`:''}Write the whole landing page in ${LP_LANG_NAMES[lang]}.
@@ -126,7 +129,7 @@ Structure it around the customer's PROBLEM and the RESULT they get (problem → 
 - description: 2 short paragraphs on how it is used and why it is worth it.
 - faq: 4 questions a hesitant buyer asks (how to use, who it is for, delivery time, paying cash on delivery) with short reassuring answers.
 - cta: a 2-4 word order button.
-- product: a short product name. slug: 2-4 lowercase latin words joined by "-" for the URL.
+${pick}- product: a short product name. slug: 2-4 lowercase latin words joined by "-" for the URL.
 - color: one hex brand color that fits the product photos and stays readable with white text.
 - image_prompts: exactly 8 English descriptions of different, realistic photo scenes. Each one must SHOW THE RESULT the customer gets (the problem visibly solved, the relief, the visible improvement), with the product present, in this order:
   (1) the product in use with the problem visibly solved right now; (2) a happy, relieved customer enjoying the result in a modern Moroccan home or setting;
@@ -211,6 +214,7 @@ async function handleLanding(request,env,user,u){
       let copy;try{copy=JSON.parse(out.map(p=>p.text||'').join(''))}catch{return json({success:false,error:'INVALID_AI_RESPONSE'},502)}
       copy.slug=String(copy.slug||'').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32)||'product';
       if(copy.slug.length<3)copy.slug+='-shop';
+      if(Object.hasOwn(LP_NICHES,b.niche))copy.niche=b.niche;else if(!Object.hasOwn(LP_NICHES,copy.niche))copy.niche='general';
       copy.image_prompts=(Array.isArray(copy.image_prompts)?copy.image_prompts:[]).map(String).map(s=>s.slice(0,600)).slice(0,8);
       const lines=(v,max)=>(Array.isArray(v)?v:[]).map(String).map(s=>s.trim().slice(0,max)).slice(0,8);
       copy.image_captions=lines(copy.image_captions,60);copy.results=lines(copy.results,140).filter(Boolean).slice(0,6);

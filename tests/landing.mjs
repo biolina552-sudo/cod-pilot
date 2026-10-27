@@ -135,7 +135,10 @@ const otherImg=(await (await call('/api/landing/image',{user:'other@test.com',ra
 assert.equal((await call('/api/landing/ai-copy',{body:{images:[otherImg]}})).status,400);
 r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});const copy=(await r.json()).copy;
 assert.equal(copy.slug,'montre-smart');assert.deepEqual(copy.results,['غادي ترتاح']);assert.deepEqual(copy.before_after,[{before:'تعب',after:'راحة'}]);
-assert.ok(/buy a SOLUTION/.test(calls[0].body.contents[0].parts.at(-1).text));assert.equal(copy.image_prompts.length,4);
+assert.ok(/buy a SOLUTION/.test(calls[0].body.contents[0].parts.at(-1).text));
+// No template chosen: the AI is asked to pick one, and an unknown answer falls back to general.
+assert.equal(copy.niche,'general');assert.ok(/- niche: .*kitchen \(Kitchen and cooking\)/.test(calls[0].body.contents[0].parts.at(-1).text));
+assert.ok(calls[0].body.generationConfig.responseSchema.properties.niche.enum.includes('pets'));assert.equal(copy.image_prompts.length,4);
 assert.ok(calls[0].body.contents[0].parts[0].inline_data.data);assert.ok(/Darija/.test(calls[0].body.contents[0].parts.at(-1).text));
 assert.equal(calls[0].headers['x-goog-api-key'],'test-gemini-key');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}});const gen=await r.json();

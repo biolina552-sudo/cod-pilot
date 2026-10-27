@@ -18,6 +18,7 @@ button.light,.btn.light{background:var(--pale);color:var(--ink)}button.danger{ba
 .rows>div{display:grid;gap:8px;grid-template-columns:60px 1fr 2fr 36px;margin:6px 0}.rows.faq>div{grid-template-columns:1fr 2fr 36px}.rows.offers>div{grid-template-columns:90px 1fr 2fr 36px}.rows input{margin:0}.rows button{padding:6px}
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;border-bottom:1px solid #eef1ee;text-align:start;vertical-align:top}th{color:var(--muted);font-weight:600}td select{padding:4px 6px;margin:0;width:auto}.tw{overflow-x:auto}
 .sum{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.sum span{background:var(--pale);border-radius:10px;padding:6px 12px;font-size:14px}
+details.more{margin:12px 0;border:1px dashed var(--line);border-radius:12px;padding:10px 14px}details.more>summary{cursor:pointer;font-weight:700}
 .hint{color:var(--muted);font-size:13px;font-weight:400}.link{direction:ltr;text-align:left;background:var(--pale);padding:8px 12px;border-radius:9px;overflow-wrap:anywhere}
 @media(max-width:640px){.rows>div,.rows.offers>div{grid-template-columns:1fr 1fr}.rows.faq>div{grid-template-columns:1fr}}
 </style>
@@ -30,34 +31,25 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     <h2>✨ صفحة جديدة بالذكاء الاصطناعي</h2>
     <label class="picker">📷 زيد تصاور المنتج (1 حتى 4)<input type="file" id="wFiles" accept="image/*" multiple></label>
     <div class="thumbs" id="wThumbs"></div>
+    <label>💰 الثمن<input id="wPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="199"></label>
+    <label>✍️ وصف المنتج <span class="hint">(شنو هو، وشنو المشكل اللي كيحل)</span><textarea id="wNotes" maxlength="1000" style="min-height:70px" placeholder="مثلا: جهاز كينعم الرجلين وكيحيد الجلد الناشف فـ 5 دقايق"></textarea></label>
+    <details class="more"><summary>⚙️ خيارات إضافية <span class="hint">(اختياري)</span></summary>
     <div class="row">
-      <label>الثمن<input id="wPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="199"></label>
-      <label>الثمن القديم <span class="hint">(اختياري)</span><input id="wOld" type="number" min="0" step="0.01" inputmode="decimal" placeholder="299"></label>
+      <label>الثمن القديم<input id="wOld" type="number" min="0" step="0.01" inputmode="decimal" placeholder="299"></label>
       <label>العملة<select id="wCurrency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
       <label>لغة الصفحة<select id="wLang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
     </div>
-    <label>القالب (النيتش) <span class="hint">(كيبدل الألوان، الأيقونات، والستيل ديال النص والتصاور)</span><select id="wNiche" class="niche"></select></label>
-    <label>سمية المنتج <span class="hint">(اختياري)</span><input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
-    <label>معلومات زايدة <span class="hint">(اختياري: المشكل اللي كيحل، شكون الزبون...)</span><textarea id="wNotes" maxlength="1000" style="min-height:60px"></textarea></label>
+    <label>القالب (النيتش)<select id="wNiche" class="niche"><option value="">🤖 تلقائي (الذكاء الاصطناعي يختار)</option></select></label>
+    <label>سمية المنتج<input id="wProduct" maxlength="120" placeholder="مثلا: ساعة ذكية"></label>
     <label>شحال من تصويرة احترافية يولد الذكاء الاصطناعي؟<select id="wCount"><option value="0">بلا تصاور</option><option value="3">3 تصاور</option><option value="6" selected>6 تصاور</option><option value="8">8 تصاور</option></select></label>
+    </details>
     <p><button class="big" id="wGo">✨ صاوب الصفحة</button></p>
     <ol class="steps" id="wSteps" hidden></ol>
   </section>
 
   <section id="editor" hidden>
     <h2 id="edTitle">تعديل الصفحة</h2>
-    <div class="row">
-      <label>سمية المنتج<input id="product" maxlength="120"></label>
-      <label>الرابط <span class="hint">(حروف لاتينية صغار و -)</span><input id="slug" maxlength="40" dir="ltr"></label>
-      <label>اللغة<select id="lang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
-    </div>
-    <div class="row">
-      <label>الثمن القديم<input id="old_price" type="number" min="0" step="0.01"></label>
-      <label>العملة<select id="currency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
-      <label>القالب<select id="niche" class="niche"></select></label>
-      <label>اللون<input id="color" type="color" value="#196c58"></label>
-      <label>الشكل<select id="layout"><option value="poster">بوسترات + أزرار "اطلب الآن" بيناتهم</option><option value="classic">كلاسيكي (الكتابة فوق التصويرة)</option></select></label>
-    </div>
+    <label>سمية المنتج<input id="product" maxlength="120"></label>
     <h3>العروض <span class="hint">(الأول هو الثمن الأساسي)</span></h3>
     <div class="rows offers" id="offers"></div><button class="light" id="addOffer">+ عرض</button>
 
@@ -66,10 +58,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     <label class="picker">+ زيد تصاور<input type="file" id="moreImages" accept="image/*" multiple></label>
     <h3>تصاور احترافية <span class="hint">(بين الأقسام)</span></h3>
     <div class="thumbs" id="scenes"></div>
-    <p><button class="light" id="dlPosters">⬇ تنزيل البوسترات كتصاور PNG (لـ YouCan ولا Shopify)</button></p>
-    <div class="row"><label>وصف تصويرة جديدة <span class="hint">(بالإنجليزية ولا بالعربية)</span><input id="scenePrompt" placeholder="the product on a kitchen table, morning light"></label><button id="genScene" style="flex:0">✨ ولد</button></div>
-
-    <h3>النص</h3>
+    <details class="more"><summary>✏️ بدل النص <span class="hint">(اختياري: الذكاء الاصطناعي كتبو)</span></summary>
     <label>العنوان الكبير<input id="headline" maxlength="160"></label>
     <label>الجملة تحت العنوان<input id="subheadline" maxlength="300"></label>
     <label>عنوان قسم المشكل<input id="problem_title" maxlength="160"></label>
@@ -85,7 +74,21 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     <h3>أسئلة متكررة</h3>
     <div class="rows faq" id="faq"></div><button class="light" id="addFaq">+ سؤال</button>
     <label>نص زر الطلب<input id="cta" maxlength="40"></label>
-
+    </details>
+    <details class="more"><summary>⚙️ إعدادات متقدمة <span class="hint">(اختياري)</span></summary>
+    <div class="row">
+      <label>الرابط <span class="hint">(حروف لاتينية صغار و -)</span><input id="slug" maxlength="40" dir="ltr"></label>
+      <label>اللغة<select id="lang"><option value="ar">الدارجة</option><option value="fr">Français</option><option value="en">English</option></select></label>
+    </div>
+    <div class="row">
+      <label>الثمن القديم<input id="old_price" type="number" min="0" step="0.01"></label>
+      <label>العملة<select id="currency"><option>MAD</option><option>SAR</option><option>AED</option><option>KWD</option><option>QAR</option><option>BHD</option><option>OMR</option><option>USD</option><option>EUR</option></select></label>
+      <label>القالب<select id="niche" class="niche"></select></label>
+      <label>اللون<input id="color" type="color" value="#196c58"></label>
+      <label>الشكل<select id="layout"><option value="poster">بوسترات + أزرار "اطلب الآن" بيناتهم</option><option value="classic">كلاسيكي (الكتابة فوق التصويرة)</option></select></label>
+    </div>
+    <div class="row"><label>وصف تصويرة جديدة <span class="hint">(بالإنجليزية ولا بالعربية)</span><input id="scenePrompt" placeholder="the product on a kitchen table, morning light"></label><button id="genScene" style="flex:0">✨ ولد</button></div>
+    <p><button class="light" id="dlPosters">⬇ تنزيل البوسترات كتصاور PNG (لـ YouCan ولا Shopify)</button></p>
     <h3>الطلب والتتبع</h3>
     <label><input type="checkbox" id="ask_address"> طلب العنوان الكامل من الزبون</label>
     <div class="row">
@@ -95,6 +98,7 @@ table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px 6px;b
     </div>
     <label>رسالة الشكر <span class="hint">(اختياري)</span><input id="thanks" maxlength="300"></label>
     <label><input type="checkbox" id="published" checked> منشورة (الناس يقدرو يشوفوها)</label>
+    </details>
     <p class="row"><button class="big" id="save">💾 حفظ ونشر</button><button class="light" id="cancel" style="flex:0">إلغاء</button></p>
     <div id="savedLink"></div>
   </section>
@@ -184,12 +188,15 @@ $('wGo').onclick=async()=>{
   const price=parseFloat($('wPrice').value);
   if(!wImages.length)return say('زيد على الأقل تصويرة وحدة ديال المنتج.',true);
   if(!(price>0))return say('دخل الثمن.',true);
+  if($('wNotes').value.trim().length<3&&!$('wProduct').value.trim())return say('كتب وصف قصير ديال المنتج: شنو هو وشنو كيحل.',true);
   if(!ai)return say(errText('AI_NOT_CONFIGURED'),true);
   const lang=$('wLang').value,count=+$('wCount').value;
   const list=['كنحلل التصاور ونكتب النص (المشكل، الحل، المميزات...)',...(count?['كنولد '+count+' تصاور احترافية (كل وحدة كتاخد شي نص دقيقة)']:[]),'الصفحة واجدة للمراجعة'];
   $('wGo').disabled=true;say('');steps(list,0);
   try{
-    const niche=$('wNiche').value,{copy}=await api('/api/landing/ai-copy',{images:wImages,lang,niche,product:$('wProduct').value,notes:$('wNotes').value});
+    const {copy}=await api('/api/landing/ai-copy',{images:wImages,lang,niche:$('wNiche').value,product:$('wProduct').value,notes:$('wNotes').value});
+    // "Automatic" template: the AI picked one from the photos.
+    const niche=$('wNiche').value||(niches.some(n=>n.id===copy.niche)?copy.niche:'general');
     const scenes=[],caps={},imgErrs=new Set();
     if(count){
       // Two at a time: faster, without hitting Gemini's rate limit.
@@ -362,12 +369,14 @@ $('save').onclick=async()=>{
     $('savedLink').innerHTML=!d.page.published?'<p>✔ تحفظات (ماشي منشورة).</p>':!d.url?'<p>✔ منشورة، ولكن الرابط العمومي (SHOP_ORIGIN) ماشي مضبوط.</p>':`<p>✔ الصفحة منشورة. هادا الرابط ديالها (حطو فالإعلان):</p><p class="link"></p><p class="row"><a class="btn" target="_blank" rel="noopener">فتح الصفحة</a><button class="light" id="copyLink">نسخ الرابط</button><a class="btn light" id="dlLink">⬇ تنزيل HTML</a></p><p class="hint">ملف HTML تقدر تحطو فـ Shopify ولا YouCan ولا أي موقع. الطلبات غادي توصلك هنا ديما، والصفحة خاصها تبقى منشورة.</p>`;
     if(d.url&&d.page.published){$('savedLink').querySelector('.link').textContent=d.url;$('savedLink').querySelector('a').href=d.url;$('dlLink').href='/api/landing/export?id='+d.page.id;$('copyLink').onclick=()=>navigator.clipboard.writeText(d.url).then(()=>say('✔ تنسخ الرابط.'))}
     say('✔ تحفظات.');wImages=[];drawW();$('wSteps').hidden=true;await loadPages();
-  }catch(x){say(errOf(x),true)}
+  }catch(x){say(errOf(x),true);
+    // Fields behind the collapsed sections: open the one holding the wrong value.
+    const f={INVALID_SLUG:'slug',SLUG_TAKEN:'slug',INVALID_META_PIXEL:'meta_pixel',INVALID_TIKTOK_PIXEL:'tiktok_pixel',INVALID_WHATSAPP:'whatsapp'}[x.message];if(f){$(f).closest('details').open=true;$(f).focus()}}
   $('save').disabled=false;
 };
 
 async function loadPages(){
-  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errOf(x),true);return}
+  try{const d=await api('/api/landing');shop=d.shop;ai=d.ai;pages=d.pages;if(!niches.length&&d.niches){niches=d.niches;document.querySelectorAll('select.niche').forEach(s=>{s.innerHTML+=niches.map(n=>`<option value="${n.id}">${n.name}</option>`).join('')})}}catch(x){$('pageList').innerHTML='';say(errOf(x),true);return}
   const el=$('pageList');el.innerHTML=pages.length?'':'<p class="hint">مازال ماعندك حتى صفحة. صاوب الأولى من الفوق.</p>';
   if(!shop)say('رابط الصفحات العمومية (SHOP_ORIGIN) ماشي مضبوط، فالروابط مازال مايبانوش.',true);
   for(const p of pages){const d=document.createElement('div');d.className='pc';const url=shop+'/'+p.slug,live=p.published&&!!shop;
