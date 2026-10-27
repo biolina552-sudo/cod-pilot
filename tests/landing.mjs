@@ -148,6 +148,22 @@ r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});assert.eq
 globalThis.fetch=async()=>new Response('{"error":{"message":"bad request x"}}',{status:400});
 const fail=await (await call('/api/landing/ai-copy',{body:{images:[up.id]}})).json();assert.equal(fail.error,'GENERATION_FAILED');assert.match(fail.detail,/400: .*bad request x/);
 globalThis.fetch=keep}
+// Free Cloudflare model goes first and gets the product photos as multipart input images.
+{const keep=globalThis.fetch,png=Buffer.from([0x89,0x50,0x4e,0x47,9,9]).toString('base64');let seen=null,gem=0;
+globalThis.fetch=async(url,opt)=>{if(String(url).includes(':generateContent'))gem++;return keep(url,opt)};
+env.AI={run:async(model,{multipart})=>{seen={model,form:await new Response(multipart.body,{headers:{'content-type':multipart.contentType}}).formData()};return {image:png}}};
+r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'on a table'}});const cf=await r.json();
+assert.equal(cf.source,'cloudflare');assert.match(cf.id,/\.png$/);assert.equal(gem,0);
+assert.equal(seen.model,'@cf/black-forest-labs/flux-2-klein-9b');assert.ok(seen.form.get('input_image_0'));assert.match(seen.form.get('prompt'),/on a table/);
+// Daily limit reached: Gemini is tried next; if it fails too, the daily-limit reason is shown.
+env.AI={run:async()=>{throw Error('4006: you have used up your daily free allocation of 10,000 neurons')}};
+r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.ok((await r.json()).id);assert.ok(gem>0);
+globalThis.fetch=async(url,opt)=>String(url).includes('/models?')?keep(url,opt):new Response('{"error":{"message":"bad"}}',{status:400});
+const both=await (await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}})).json();assert.equal(both.error,'CF_DAILY_LIMIT');assert.match(both.detail,/cloudflare: 4006.*\| .*400/);
+// Without a Gemini key, Cloudflare alone still works.
+env.AI={run:async()=>({image:png})};const key=env.GEMINI_API_KEY;delete env.GEMINI_API_KEY;
+assert.equal((await (await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}})).json()).source,'cloudflare');
+env.GEMINI_API_KEY=key;delete env.AI;globalThis.fetch=keep}
 globalThis.fetch=async()=>new Response('{"error":{"message":"API_KEY_INVALID test-gemini-key"}}',{status:400});
 r=await call('/api/landing/ai-copy',{body:{images:[up.id]}});assert.equal((await r.json()).error,'GEMINI_AUTH_FAILED');
 globalThis.fetch=async()=>{throw new DOMException('timed out','TimeoutError')};

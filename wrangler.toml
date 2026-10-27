@@ -6,6 +6,10 @@ compatibility_date = "2026-10-01"
 [build]
 command = "npm run build"
 
+# Workers AI: free daily allowance used for landing page photos.
+[ai]
+binding = "AI"
+
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "cod-pilot-media"
