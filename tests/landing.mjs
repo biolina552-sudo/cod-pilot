@@ -63,7 +63,13 @@ r=await order({name:'Bot',phone:'0612345678',city:'Rabat',offer:'0',website:'spa
 assert.equal(r.headers.get('location'),'https://shop.test/smart-watch/thanks');
 assert.ok(!(await (await shopGet('/smart-watch/thanks?q=0')).text()).includes("'Purchase'"));
 assert.equal([...env.BUCKET.m.keys()].filter(k=>k.startsWith('orders/')).length,0);
+// A real order also goes to the seller's n8n webhook with the shared secret header.
+const hooks=[],fetch0=globalThis.fetch;globalThis.fetch=async(url,opt)=>{hooks.push({url:String(url),opt});return new Response('ok')};
+Object.assign(env,{N8N_WEBHOOK_URL:'https://n8n.test/webhook/orders',N8N_WEBHOOK_SECRET:'s3cret'});
 r=await order({name:'سعيد',phone:'06 12-34 56 78',city:'الدار البيضاء',offer:'1'});assert.equal(r.status,303);
+globalThis.fetch=fetch0;delete env.N8N_WEBHOOK_URL;delete env.N8N_WEBHOOK_SECRET;
+assert.equal(hooks.length,1);assert.equal(hooks[0].url,'https://n8n.test/webhook/orders');assert.equal(hooks[0].opt.headers['x-cod-pilot-secret'],'s3cret');
+{const h=JSON.parse(hooks[0].opt.body);assert.deepEqual([h.phone,h.price,h.qty,h.city,h.offer],['0612345678',349,2,'الدار البيضاء','2 حبات'])}
 const loc=r.headers.get('location');assert.match(loc,/^https:\/\/shop\.test\/smart-watch\/thanks\?o=\d{13}-[a-f0-9]{8}$/);
 const thanks=await (await shopGet(loc.slice('https://shop.test'.length))).text();
 assert.ok(thanks.includes('"value":349')&&thanks.includes('eventID:"'+loc.split('o=')[1]+'"')&&thanks.includes('event_id:'));

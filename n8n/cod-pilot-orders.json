@@ -1,0 +1,41 @@
+{
+  "name": "COD Pilot - new orders",
+  "nodes": [
+    {
+      "parameters": {"httpMethod": "POST", "path": "cod-pilot-orders", "responseMode": "onReceived", "options": {}},
+      "id": "6f1c1b7e-0001-4000-8000-000000000001",
+      "name": "New order",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "cod-pilot-orders"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Put the same secret word here and in the GitHub secret N8N_WEBHOOK_SECRET.\nconst secret = 'CHANGE_ME';\nreturn $input.all()\n  .filter(i => secret !== 'CHANGE_ME' && i.json.headers['x-cod-pilot-secret'] === secret)\n  .map(i => ({ json: i.json.body }));"
+      },
+      "id": "6f1c1b7e-0002-4000-8000-000000000002",
+      "name": "Check secret",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "dataTableId": {"__rl": true, "mode": "list", "value": ""},
+        "columns": {"mappingMode": "autoMapInputData", "value": {}}
+      },
+      "id": "6f1c1b7e-0003-4000-8000-000000000003",
+      "name": "Save order",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [480, 0]
+    }
+  ],
+  "connections": {
+    "New order": {"main": [[{"node": "Check secret", "type": "main", "index": 0}]]},
+    "Check secret": {"main": [[{"node": "Save order", "type": "main", "index": 0}]]}
+  },
+  "settings": {}
+}
