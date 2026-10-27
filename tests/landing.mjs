@@ -139,9 +139,9 @@ assert.ok(calls[1].url.includes('/gemini-9-flash-image-preview:'));
 {const keep=globalThis.fetch;let n=0;globalThis.fetch=async(url,opt)=>String(url).includes('/models?')||n++?keep(url,opt):new Response('{"candidates":[]}');
 r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.match((await r.json()).id,/\.png$/);globalThis.fetch=keep}
 {const keep=globalThis.fetch;globalThis.fetch=async(url,opt)=>String(url).includes('/models?')?keep(url,opt):new Response('{"error":{"message":"Quota exceeded, limit: 0, model: x free_tier"}}',{status:429});
-r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.equal((await r.json()).error,'AI_IMAGE_NEEDS_BILLING');
+r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.equal((await r.json()).error,'GEMINI_NEEDS_BILLING');
 globalThis.fetch=async(url,opt)=>String(url).includes('/models?')?keep(url,opt):new Response('{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details."}}',{status:429});
-r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.equal((await r.json()).error,'AI_IMAGE_NEEDS_BILLING');globalThis.fetch=keep}
+r=await call('/api/landing/ai-image',{body:{images:[up.id],prompt:'x'}});assert.equal((await r.json()).error,'GEMINI_NEEDS_BILLING');globalThis.fetch=keep}
 // A model that fails with a plain 400 is skipped for the next one; the reason reaches the owner.
 {const keep=globalThis.fetch,seen=[];globalThis.fetch=async(url,opt)=>{seen.push(String(url));return String(url).includes('gemini-3.6-flash:')?new Response('{"error":{"message":"Invalid value at thinking_level"}}',{status:400}):keep(url,opt)};
 r=await call('/api/landing/ai-copy',{body:{images:[up.id],lang:'ar'}});assert.equal(r.status,200);assert.ok(seen.some(u=>u.includes('gemini-3.8-flash:')));

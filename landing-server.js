@@ -48,7 +48,7 @@ async function lpGemini(env,model,body){
     console.error('LANDING_AI',model,r.status,msg);
     const busy=[500,502,503,504].includes(r.status)||/overloaded|UNAVAILABLE/.test(msg);
     // detail is shown to the app owner only (AI routes are owner-only) so a failure can be diagnosed.
-    throw Object.assign(Error('provider'),{status:r.status,detail:model+' '+r.status+': '+msg.replace(/\s+/g,' ').slice(0,200),code:busy?'AI_BUSY':r.status===429?(/limit: 0\b|free_tier|exceeded your current quota|billing/i.test(msg)?'AI_IMAGE_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
+    throw Object.assign(Error('provider'),{status:r.status,detail:model+' '+r.status+': '+msg.replace(/\s+/g,' ').slice(0,200),code:busy?'AI_BUSY':r.status===429?(/limit: 0\b|free_tier|exceeded your current quota|billing/i.test(msg)?'GEMINI_NEEDS_BILLING':'GEMINI_RATE_LIMITED'):r.status===400&&/not supported|does not support|response modalit/i.test(msg)?'AI_MODEL_UNAVAILABLE':[401,403].includes(r.status)||/API_KEY/.test(msg)?'GEMINI_AUTH_FAILED':r.status===404?'AI_MODEL_UNAVAILABLE':'GENERATION_FAILED'});
   }
   const d=await r.json();
   if(d.promptFeedback?.blockReason)throw Object.assign(Error('blocked'),{code:'AI_CONTENT_BLOCKED'});
