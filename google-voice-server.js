@@ -1,7 +1,7 @@
 // Google TTS: fixed endpoint/model; no automatic fallback to a paid provider.
-async function googleVoice(text,env,voice='Kore'){
+async function googleVoice(text,env,voice='Kore',delivery='Warm, clear, conversational advertising delivery, moderate pace.'){
 try{
-const r=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GEMINI_API_KEY.trim()},body:JSON.stringify({model:'gemini-3.8-flash-lite-tts',input:[{type:'user_input',content:[{type:'text',text,annotations:[{type:'speech_metadata',style:'Speak in natural Moroccan Darija, with authentic Moroccan pronunciation. Warm, clear, conversational advertising delivery, moderate pace. Read the transcript exactly; do not add words.'}]}]}],response_format:{type:'audio'},generation_config:{speech_config:[{voice}]}}),redirect:'manual',signal:AbortSignal.timeout(90000)});
+const r=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GEMINI_API_KEY.trim()},body:JSON.stringify({model:'gemini-3.8-flash-lite-tts',input:[{type:'user_input',content:[{type:'text',text,annotations:[{type:'speech_metadata',style:'Speak in natural Moroccan Darija, with authentic Moroccan pronunciation. '+delivery+' Read the transcript exactly; do not add words.'}]}]}],response_format:{type:'audio'},generation_config:{speech_config:[{voice}]}}),redirect:'manual',signal:AbortSignal.timeout(90000)});
 if(!r.ok){
 let errorStatus=null,safeMessage='',reason=null;
 try{const raw=await r.text();let e;try{e=JSON.parse(raw)}catch{e={}}if(Array.isArray(e))e=e[0];

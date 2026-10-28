@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>صايب صوت | COD Pilot</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--text:#1d2433;--muted:#6b7280;--accent:#4f46e5;--line:#e5e7eb;--ok:#047857;--err:#b91c1c}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1220;--card:#181c2e;--text:#eef0f6;--muted:#9aa3b5;--accent:#818cf8;--line:#2a3047;--ok:#34d399;--err:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 system-ui,"Segoe UI",Tahoma,sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:26px;margin:0 0 4px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.top a{color:var(--accent);font-size:14px;text-decoration:none}
+.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+.step{display:inline-block;background:var(--accent);color:#fff;border-radius:50%;width:26px;height:26px;text-align:center;line-height:26px;font-weight:700;margin-left:8px}
+label{display:block;font-weight:700;margin-bottom:8px}
+select,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--text);font:inherit}
+textarea{min-height:180px;resize:vertical}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1 1 200px}
+.hint{color:var(--muted);font-size:14px;margin-top:6px}
+button{background:var(--accent);color:#fff;border:0;border-radius:12px;padding:14px 22px;font:inherit;font-weight:700;cursor:pointer;width:100%;font-size:18px}
+button:disabled{opacity:.6;cursor:wait}
+#status{margin-top:12px;font-weight:700}
+.ok{color:var(--ok)}.err{color:var(--err)}
+audio{width:100%;margin-top:12px}
+a.dl{display:inline-block;margin-top:10px;color:var(--accent);font-weight:700}
+.item{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.item p{margin:0;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<div class="top"><h1>🎙️ صايب صوت</h1><a href="/">← الرجوع</a></div>
+<p class="sub">كتب النص، ختار الصوت، ودير "صايب الصوت". المفتاح ديال Gemini ديجا محطوط فالتطبيق.</p>
+
+<div class="card">
+  <label for="text"><span class="step">1</span>النص</label>
+  <textarea id="text" maxlength="4000" placeholder="مثلا: واش عييتي من الشعر اللي كيطيح؟ جربي هاد السيروم الطبيعي، والتوصيل فابور لجميع المدن!"></textarea>
+  <div class="hint"><span id="count">0</span> / 4000 حرف</div>
+</div>
+
+<div class="card">
+  <label><span class="step">2</span>الصوت والطريقة</label>
+  <div class="row">
+    <div>
+      <label for="voice" style="font-weight:400">الصوت</label>
+      <select id="voice"></select>
+    </div>
+    <div>
+      <label for="style" style="font-weight:400">طريقة الكلام</label>
+      <select id="style">
+        <option value="">إشهار دارجة (عادي)</option>
+        <option value="hype">إشهار حماسي (تيكتوك)</option>
+        <option value="calm">هادئ ومقنع</option>
+        <option value="testimonial">شهادة ديال كليان</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<button id="go">🎧 صايب الصوت</button>
+<div id="status"></div>
+
+<div class="card" id="results" style="display:none;margin-top:16px">
+  <label>الأصوات اللي صاوبتي</label>
+  <div id="list"></div>
+</div>
+</main>
+
+<script>
+const VOICES=[['Kore','Kore (امرأة، قوية)'],['Aoede','Aoede (امرأة، خفيفة)'],['Leda','Leda (امرأة، شابة)'],['Sulafat','Sulafat (امرأة، دافية)'],['Despina','Despina (امرأة، ناعمة)'],['Achernar','Achernar (امرأة، رقيقة)'],['Zephyr','Zephyr (امرأة، ضاوية)'],['Puck','Puck (راجل، فرحان)'],['Charon','Charon (راجل، كيشرح)'],['Fenrir','Fenrir (راجل، متحمس)'],['Orus','Orus (راجل، ثابت)'],['Algieba','Algieba (راجل، ناعم)'],['Alnilam','Alnilam (راجل، جدي)'],['Sadaltager','Sadaltager (راجل، عارف)']];
+const ERRORS={VOICE_OWNER_ONLY:'هاد الحساب ما عندوش الحق يصايب الأصوات.',VOICE_NOT_CONFIGURED:'المفتاح ديال Gemini ما محطوطش فالتطبيق.',VOICE_KEY_INVALID:'المفتاح ديال Gemini اللي فالتطبيق غالط.',VOICE_AUTH:'Google رفض المفتاح ديال التطبيق.',VOICE_LIMIT:'وصلتي للحد ديال اليوم فالنسخة المجانية. عاود من بعد شوية ولا غدا.',VOICE_PAYMENT_REQUIRED:'Google كيطلب الخلاص باش يكمل.',VOICE_MODEL_UNAVAILABLE:'الموديل ديال الصوت ما متوفرش دابا.',INVALID_TEXT:'النص فيه مشكل. جرب نص أقصر.',UNAUTHENTICATED:'خاصك تدخل للحساب ديالك عاود.'};
+const $=id=>document.getElementById(id);
+const store={get(k){try{return localStorage.getItem(k)}catch{return null}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+for(const [v,n] of VOICES){const o=document.createElement('option');o.value=v;o.textContent=n;$('voice').appendChild(o)}
+$('voice').value=store.get('voice')||'Kore';$('style').value=store.get('style')||'';
+$('text').addEventListener('input',()=>$('count').textContent=$('text').value.length);
+function say(msg,cls){$('status').className=cls||'';$('status').textContent=msg}
+
+// The server takes at most 1000 characters per call, so long scripts go in sentence-sized pieces.
+function chunks(text,max=900){const out=[];let cur='';
+  for(let s of text.match(/[^.!?؟،,\n]+[.!?؟،,\n]*|[.!?؟،,\n]+/g)||[]){
+    while(s.length>max){if(cur.trim())out.push(cur.trim());cur='';out.push(s.slice(0,max));s=s.slice(max)}
+    if((cur+s).length>max){if(cur.trim())out.push(cur.trim());cur=''}
+    cur+=s}
+  if(cur.trim())out.push(cur.trim());return out}
+function joinWav(parts){if(parts.length===1)return parts[0];const datas=parts.map(p=>p.slice(44));const len=datas.reduce((a,d)=>a+d.length,0);const out=new Uint8Array(44+len);out.set(parts[0].slice(0,44));const v=new DataView(out.buffer);v.setUint32(4,36+len,true);v.setUint32(40,len,true);let o=44;for(const d of datas){out.set(d,o);o+=d.length}return out}
+
+async function speak(text,voice,style){
+  const r=await fetch('/api/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:'google',voice,style:style||undefined,text})});
+  if(!r.ok){let e={};try{e=await r.json()}catch{}throw new Error(ERRORS[e.error]||'وقع مشكل فالصوت ('+(e.error||r.status)+'). عاود جرب.')}
+  return new Uint8Array(await r.arrayBuffer());
+}
+
+let n=0;
+$('go').onclick=async()=>{
+  const text=$('text').value.trim(),voice=$('voice').value,style=$('style').value;
+  if(!text)return say('كتب النص فالخانة 1.','err');
+  store.set('voice',voice);store.set('style',style);
+  const pieces=chunks(text);
+  $('go').disabled=true;
+  try{
+    const parts=[];
+    for(let i=0;i<pieces.length;i++){say('⏳ كنصايبو الصوت'+(pieces.length>1?' ('+(i+1)+'/'+pieces.length+')':'')+'... تسنى شي 10 تال 30 ثانية');parts.push(await speak(pieces[i],voice,style))}
+    const url=URL.createObjectURL(new Blob([joinWav(parts)],{type:'audio/wav'}));n++;
+    const it=document.createElement('div');it.className='item';
+    const p=document.createElement('p');p.textContent=n+'. '+voice+' — '+text.slice(0,80)+(text.length>80?'…':'');
+    const au=document.createElement('audio');au.controls=true;au.src=url;
+    const a=document.createElement('a');a.className='dl';a.href=url;a.download='sawt-'+n+'-'+voice+'.wav';a.textContent='⬇️ حمل الصوت (WAV)';
+    it.append(p,au,a);$('list').prepend(it);$('results').style.display='block';au.play().catch(()=>{});
+    say('✅ الصوت واجد! سمعو وحملو لتحت.','ok');
+  }catch(e){say('❌ '+e.message,'err')}
+  finally{$('go').disabled=false}
+};
+</script>
+</body>
+</html>
