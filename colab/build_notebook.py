@@ -216,20 +216,22 @@ def ask_photo(msg, tag):
     print(msg)
     up = files.upload()
     if not up: raise SystemExit('❌ ما تحطات حتى صورة.')
-    name = next(iter(up))
-    path = f'/content/upload_{tag}_' + name.replace(' ', '_')
-    shutil.move(name, path)
-    return path
+    paths = []
+    for name in up:
+        path = f'/content/upload_{tag}_' + name.replace(' ', '_')
+        shutil.move(name, path)
+        paths.append(path)
+    return paths
 
 work = f'/content/work/{int(time.time())}'
 os.makedirs(work, exist_ok=True)
 num = int(character.split('.')[0])
 if num == 5:
-    face = ask_photo('📷 حط صورة الشخصية (وجه واضح، كيشوف للكاميرا):', 'face')
+    face = ask_photo('📷 حط صورة الشخصية (وجه واضح، كيشوف للكاميرا):', 'face')[0]
 else:
     face = f'/content/characters/{num}.png'
 voice_name = voice.split(' ')[0] if voice != 'تلقائي' else {1: 'Sulafat', 2: 'Leda', 3: 'Puck', 4: 'Orus', 5: 'Kore'}[num]
-photo = ask_photo('🛍️ حط صورة المنتج:', 'product') if add_product_photo else None
+photos = ask_photo('🛍️ حط صورة المنتج (تقدر تختار بزاف ديال الصور):', 'product') if add_product_photo else []
 
 script = text.strip() or write_script()
 if len(script) > 1500:
@@ -251,10 +253,18 @@ if p.returncode or not vids:
 print('⏳ كنركبو الفيديو 9:16...')
 out = f'/content/video_{os.path.basename(work)}.mp4'
 bg = '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.08[bg];[0:v]scale=1080:1080:force_original_aspect_ratio=decrease[fg];'
-if photo:
-    inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav', '-loop', '1', '-i', photo]
-    graph = bg + ('[2:v]scale=960:640:force_original_aspect_ratio=decrease[pr];'
-                  '[bg][fg]overlay=(W-w)/2:160[t];[t][pr]overlay=(W-w)/2:1260:shortest=1,fps=25,format=yuv420p[v]')
+if photos:
+    # Each product photo takes an equal slice of the voice, one after another.
+    with wave.open(f'{work}/voice.wav') as w:
+        seg = w.getnframes() / w.getframerate() / len(photos)
+    inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
+    graph = bg + '[bg][fg]overlay=(W-w)/2:160[t0];'
+    for i, ph in enumerate(photos):
+        inputs += ['-loop', '1', '-i', ph]
+        end = 'inf' if i == len(photos) - 1 else f'{(i + 1) * seg:.3f}'
+        graph += (f'[{i + 2}:v]scale=960:640:force_original_aspect_ratio=decrease[p{i}];'
+                  f"[t{i}][p{i}]overlay=(W-w)/2:1260:shortest=1:enable='between(t,{i * seg:.3f},{end})'[t{i + 1}];")
+    graph += f'[t{len(photos)}]fps=25,format=yuv420p[v]'
 else:
     inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
     graph = bg + '[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=25,format=yuv420p[v]'
