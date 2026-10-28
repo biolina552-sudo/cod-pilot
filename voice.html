@@ -83,11 +83,13 @@ function say(msg,cls){$('status').className=cls||'';$('status').textContent=msg}
 // The server takes at most 1000 characters per call, so long scripts go in sentence-sized pieces.
 function chunks(text,max=900){const out=[];let cur='';
   for(let s of text.match(/[^.!?؟،,\n]+[.!?؟،,\n]*|[.!?؟،,\n]+/g)||[]){
-    while(s.length>max){if(cur.trim())out.push(cur.trim());cur='';out.push(s.slice(0,max));s=s.slice(max)}
+    while(s.length>max){if(cur.trim())out.push(cur.trim());cur='';let k=s.lastIndexOf(' ',max);if(k<=0)k=max;out.push(s.slice(0,k).trim());s=s.slice(k).trimStart()}
     if((cur+s).length>max){if(cur.trim())out.push(cur.trim());cur=''}
     cur+=s}
   if(cur.trim())out.push(cur.trim());return out}
-function joinWav(parts){if(parts.length===1)return parts[0];const datas=parts.map(p=>p.slice(44));const len=datas.reduce((a,d)=>a+d.length,0);const out=new Uint8Array(44+len);out.set(parts[0].slice(0,44));const v=new DataView(out.buffer);v.setUint32(4,36+len,true);v.setUint32(40,len,true);let o=44;for(const d of datas){out.set(d,o);o+=d.length}return out}
+// Find the data chunk instead of assuming a 44-byte header; the first part's header is reused.
+function wavData(u){const v=new DataView(u.buffer,u.byteOffset,u.byteLength);let o=12;while(o+8<=u.length){const id=String.fromCharCode(...u.slice(o,o+4)),n=v.getUint32(o+4,true);if(id==='data')return {start:o+8,bytes:u.slice(o+8,Math.min(u.length,o+8+n))};o+=8+n+(n&1)}throw new Error('الصوت اللي رجع ما مفهومش. عاود جرب.')}
+function joinWav(parts){if(parts.length===1)return parts[0];const first=wavData(parts[0]),datas=parts.map(p=>wavData(p).bytes);const len=datas.reduce((a,d)=>a+d.length,0);const out=new Uint8Array(first.start+len);out.set(parts[0].slice(0,first.start));const v=new DataView(out.buffer);v.setUint32(4,out.length-8,true);v.setUint32(first.start-4,len,true);let o=first.start;for(const d of datas){out.set(d,o);o+=d.length}return out}
 
 async function speak(text,voice,style){
   const r=await fetch('/api/voice/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:'google',voice,style:style||undefined,text})});
@@ -111,6 +113,7 @@ $('go').onclick=async()=>{
     const au=document.createElement('audio');au.controls=true;au.src=url;
     const a=document.createElement('a');a.className='dl';a.href=url;a.download='sawt-'+n+'-'+voice+'.wav';a.textContent='⬇️ حمل الصوت (WAV)';
     it.append(p,au,a);$('list').prepend(it);$('results').style.display='block';au.play().catch(()=>{});
+    while($('list').children.length>20){const old=$('list').lastElementChild;URL.revokeObjectURL(old.querySelector('audio').src);old.remove()}
     say('✅ الصوت واجد! سمعو وحملو لتحت.','ok');
   }catch(e){say('❌ '+e.message,'err')}
   finally{$('go').disabled=false}
