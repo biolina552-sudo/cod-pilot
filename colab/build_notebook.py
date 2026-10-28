@@ -139,8 +139,11 @@ def key():
 KEY = key()
 
 def gemini(path, body):
-    r = requests.post('https://generativelanguage.googleapis.com' + path, json=body,
-                      headers={'x-goog-api-key': KEY}, timeout=180)
+    try:
+        r = requests.post('https://generativelanguage.googleapis.com' + path, json=body,
+                          headers={'x-goog-api-key': KEY}, timeout=180)
+    except requests.RequestException as e:
+        raise RuntimeError(f'network: {type(e).__name__}')
     if r.ok: return r.json()
     try: msg = r.json()['error']['message']
     except Exception: msg = r.text[:300]
@@ -154,7 +157,7 @@ STYLES = {'عادي': 'Warm, clear, conversational advertising delivery, moderat
           'هادئ ومقنع': 'Calm, soft, trustworthy tone, like a friend giving advice.',
           'شهادة ديال كليان': 'Like a real customer giving an honest testimonial, casual and spontaneous.'}
 
-LIMIT_MSG = '❌ وصلتي للحد ديال اليوم فـ Gemini الفابور. عاود من بعد.'
+LIMIT_MSG = '❌ وصلتي للحد ديال Gemini الفابور. عاود من بعد شوية.'
 
 def write_script():
     prompt = ('Write a short Moroccan Darija (Arabic script) video ad script, spoken by one person to the camera, '
@@ -218,7 +221,7 @@ def ask_photo(msg, tag):
     if not up: raise SystemExit('❌ ما تحطات حتى صورة.')
     paths = []
     for name in up:
-        path = f'/content/upload_{tag}_' + name.replace(' ', '_')
+        path = f'/content/upload_{tag}_{len(paths)}_' + name.replace(' ', '_')
         shutil.move(name, path)
         paths.append(path)
     return paths
@@ -256,7 +259,9 @@ bg = '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,b
 if photos:
     # Each product photo takes an equal slice of the voice, one after another.
     with wave.open(f'{work}/voice.wav') as w:
-        seg = w.getnframes() / w.getframerate() / len(photos)
+        dur = w.getnframes() / w.getframerate()
+    photos = photos[:max(1, int(dur))]  # at least a second per photo
+    seg = dur / len(photos)
     inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
     graph = bg + '[bg][fg]overlay=(W-w)/2:160[t0];'
     for i, ph in enumerate(photos):
