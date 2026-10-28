@@ -136,7 +136,7 @@ def key():
         pass
     from getpass import getpass
     return getpass('حط المفتاح ديال Gemini هنا (ما غاديش يبان) ودير Enter: ').strip()
-KEY = globals().get('KEY') or key()
+KEY = key()
 
 def gemini(path, body):
     r = requests.post('https://generativelanguage.googleapis.com' + path, json=body,
@@ -144,7 +144,8 @@ def gemini(path, body):
     if r.ok: return r.json()
     try: msg = r.json()['error']['message']
     except Exception: msg = r.text[:300]
-    if r.status_code == 429: raise SystemExit('❌ وصلتي للحد ديال اليوم فـ Gemini الفابور. عاود من بعد.')
+    # Limits are per model, so a 429 lets the caller try the next model.
+    if r.status_code == 429: raise RuntimeError('LIMIT')
     if 'API key' in msg or r.status_code in (401, 403): raise SystemExit('❌ المفتاح ديال Gemini غالط. شوف 🔑 Secrets.')
     raise RuntimeError(msg)
 
@@ -152,6 +153,8 @@ STYLES = {'عادي': 'Warm, clear, conversational advertising delivery, moderat
           'حماسي (تيكتوك)': 'Energetic, excited, fast-paced advertising delivery, like a TikTok ad.',
           'هادئ ومقنع': 'Calm, soft, trustworthy tone, like a friend giving advice.',
           'شهادة ديال كليان': 'Like a real customer giving an honest testimonial, casual and spontaneous.'}
+
+LIMIT_MSG = '❌ وصلتي للحد ديال اليوم فـ Gemini الفابور. عاود من بعد.'
 
 def write_script():
     prompt = ('Write a short Moroccan Darija (Arabic script) video ad script, spoken by one person to the camera, '
@@ -161,10 +164,12 @@ def write_script():
     for m in ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite']:
         try:
             d = gemini(f'/v1beta/models/{m}:generateContent', {'contents': [{'parts': [{'text': prompt}]}]})
-            out = ''.join(p.get('text', '') for p in d['candidates'][0]['content']['parts']).strip()
+            parts = (d.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
+            out = ''.join(p.get('text', '') for p in parts).strip()
             if out: return out
         except RuntimeError as e:
             last = e
+    if str(last) == 'LIMIT': raise SystemExit(LIMIT_MSG)
     raise SystemExit(f'❌ Gemini ما قدرش يكتب النص: {last}')
 
 def to_wav(b64, mime, out):
@@ -177,6 +182,7 @@ def to_wav(b64, mime, out):
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(raw)
 
 def speak(txt, voice_name, out):
+    last = None
     delivery = 'Speak in natural Moroccan Darija, with authentic Moroccan pronunciation. ' + STYLES[style]
     try:
         d = gemini('/v1beta/interactions', {
@@ -190,19 +196,20 @@ def speak(txt, voice_name, out):
                 for p in s.get('content', []):
                     if p.get('type') == 'audio' and p.get('data'):
                         return to_wav(p['data'], p.get('mime_type'), out)
-    except RuntimeError:
-        pass
+    except RuntimeError as e:
+        last = e
     for m in ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts']:
         try:
             d = gemini(f'/v1beta/models/{m}:generateContent', {
                 'contents': [{'parts': [{'text': delivery + ' Read exactly this text:\n' + txt}]}],
                 'generationConfig': {'responseModalities': ['AUDIO'], 'speechConfig': {
                     'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': voice_name}}}}})
-            for p in d['candidates'][0]['content']['parts']:
+            for p in (d.get('candidates') or [{}])[0].get('content', {}).get('parts', []):
                 if 'inlineData' in p:
                     return to_wav(p['inlineData']['data'], p['inlineData'].get('mimeType'), out)
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            last = e
+    if str(last) == 'LIMIT': raise SystemExit(LIMIT_MSG)
     raise SystemExit('❌ Gemini ما رجعش الصوت. عاود من بعد شوية.')
 
 def ask_photo(msg):
@@ -225,9 +232,11 @@ voice_name = voice.split(' ')[0] if voice != 'تلقائي' else {1: 'Sulafat', 
 photo = ask_photo('🛍️ حط صورة المنتج:') if add_product_photo else None
 
 script = text.strip() or write_script()
+if len(script) > 1500:
+    raise SystemExit(f'❌ النص طويل بزاف ({len(script)} حرف). خليه تحت 1500 حرف (شي دقيقة ديال الكلام).')
 print('📝 النص:\n' + script + '\n')
 print('⏳ كنصاوبو الصوت...')
-speak(script[:1500], voice_name, f'{work}/voice.wav')
+speak(script, voice_name, f'{work}/voice.wav')
 
 print('⏳ كنخليو الشخصية تهضر (هادي كتاخد شي 2 حتى 6 دقايق)...')
 p = subprocess.run(['/content/st38/bin/python', 'inference.py', '--driven_audio', f'{work}/voice.wav',
@@ -241,14 +250,14 @@ if p.returncode or not vids:
 
 print('⏳ كنركبو الفيديو 9:16...')
 out = f'/content/video_{os.path.basename(work)}.mp4'
-bg = '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.08[bg];[0:v]scale=1080:1080[fg];'
+bg = '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.08[bg];[0:v]scale=1080:1080:force_original_aspect_ratio=decrease[fg];'
 if photo:
     inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav', '-loop', '1', '-i', photo]
     graph = bg + ('[2:v]scale=960:640:force_original_aspect_ratio=decrease[pr];'
-                  '[bg][fg]overlay=0:160[t];[t][pr]overlay=(W-w)/2:1260:shortest=1,fps=25,format=yuv420p[v]')
+                  '[bg][fg]overlay=(W-w)/2:160[t];[t][pr]overlay=(W-w)/2:1260:shortest=1,fps=25,format=yuv420p[v]')
 else:
     inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
-    graph = bg + '[bg][fg]overlay=0:420,fps=25,format=yuv420p[v]'
+    graph = bg + '[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=25,format=yuv420p[v]'
 p = subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', *inputs, '-filter_complex', graph,
                     '-map', '[v]', '-map', '1:a', '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast',
                     '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out],
