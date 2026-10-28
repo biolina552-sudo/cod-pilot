@@ -383,6 +383,10 @@ b64 = base64.b64encode(open(out, 'rb').read()).decode()
 display(HTML(f'<video src="data:video/mp4;base64,{b64}" controls width="300"></video>'))
 print('✅ الفيديو واجد! غادي يتحمل دابا لـ Downloads.')
 files.download(out)
+# The voice and the face, for realistic-motion sites (Hedra, WaveSpeedAI InfiniteTalk).
+shutil.copy(f'{work}/voice.wav', f'/content/voice_{os.path.basename(work)}.wav')
+files.download(f'/content/voice_{os.path.basename(work)}.wav')
+files.download(face)
 '''
 
 nb = {
