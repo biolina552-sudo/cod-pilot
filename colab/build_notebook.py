@@ -261,7 +261,7 @@ motion = (['--still'] if movement.startswith('ثابتة') else
           ['--pose_style', str(int(time.time()) % 46), '--expression_scale', '1.4' if movement.startswith('قوية') else '1.15'])
 p = subprocess.run(['/content/st38/bin/python', 'inference.py', '--driven_audio', f'{work}/voice.wav',
                     '--source_image', face, '--result_dir', f'{work}/st', '--size', '512' if quality.startswith('عالية') else '256',
-                    *motion, '--preprocess', 'full', '--batch_size', '8',
+                    *motion, '--preprocess', 'full', '--batch_size', '2' if quality.startswith('عالية') else '8',
                     *([] if quality.startswith('سريعة') else ['--enhancer', 'gfpgan'])], cwd='/content/SadTalker',
                    capture_output=True, text=True)
 vids = sorted(glob.glob(f'{work}/st/*.mp4'))
