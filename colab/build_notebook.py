@@ -119,6 +119,7 @@ product = "مثلا: سيروم الشعر، 199 درهم، التوصيل فا�
 voice = "تلقائي"  #@param ["تلقائي", "Kore (امرأة، قوية)", "Sulafat (امرأة، دافية)", "Leda (امرأة، شابة)", "Aoede (امرأة، خفيفة)", "Puck (راجل، فرحان)", "Orus (راجل، ثابت)", "Charon (راجل، كيشرح)", "Fenrir (راجل، متحمس)"]
 style = "عادي"  #@param ["عادي", "حماسي (تيكتوك)", "هادئ ومقنع", "شهادة ديال كليان"]
 add_product_photo = True  #@param {type:"boolean"}
+subtitles = True  #@param {type:"boolean"}
 #@markdown **الحركة والجودة:**
 movement = "طبيعية (الراس كيتحرك)"  #@param ["طبيعية (الراس كيتحرك)", "قوية (تعابير أكثر)", "ثابتة (غير الفم)"]
 quality = "عادية (أسرع)"  #@param ["عادية (أسرع)", "عالية 512 (كتاخد ضعف الوقت)"]
@@ -269,24 +270,105 @@ if p.returncode or not vids:
 
 print('⏳ كنركبو الفيديو 9:16...')
 out = f'/content/video_{os.path.basename(work)}.mp4'
-bg = '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.08[bg];[0:v]scale=1080:1080:force_original_aspect_ratio=decrease[fg];'
+FONT = '/content/fonts/Vazirmatn.ttf'
+if not os.path.exists(FONT):
+    subprocess.run('pip install -q arabic-reshaper python-bidi', shell=True)
+    os.makedirs('/content/fonts', exist_ok=True)
+    r = requests.get('https://raw.githubusercontent.com/google/fonts/main/ofl/vazirmatn/Vazirmatn%5Bwght%5D.ttf', timeout=60)
+    r.raise_for_status()
+    open(FONT, 'wb').write(r.content)
+import re, arabic_reshaper
+from bidi.algorithm import get_display
+from PIL import Image, ImageDraw, ImageFont
+
+def font(size):
+    # BASIC layout: the text is already shaped and ordered below, so Pillow must not reorder it again.
+    f = ImageFont.truetype(FONT, size, layout_engine=ImageFont.Layout.BASIC)
+    f.set_variation_by_axes([850])
+    return f
+
+def lines_of(txt, f, width):
+    out, cur = [], ''
+    for w in txt.split():
+        t = (cur + ' ' + w).strip()
+        if cur and f.getlength(get_display(arabic_reshaper.reshape(t))) > width:
+            out.append(cur); cur = w
+        else:
+            cur = t
+    return out + ([cur] if cur else [])
+
+def draw_lines(d, lines, f, y, fill, stroke=0):
+    for ln in lines:
+        vis = get_display(arabic_reshaper.reshape(ln))
+        d.text((540, y), vis, font=f, fill=fill, anchor='mt', stroke_width=stroke, stroke_fill='black')
+        y += int(f.size * 1.25)
+    return y
+
+with wave.open(f'{work}/voice.wav') as w:
+    dur = w.getnframes() / w.getframerate()
+inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
+layers = []  # (png path, start, end)
+
+# Top banner: product name, then price and free delivery in a yellow pill.
+if product.strip() and not product.startswith('مثلا'):
+    parts = [x.strip() for x in re.split('[،,]', product) if x.strip()]
+    price = next((x for x in parts if re.search(r'\d', x)), '')
+    free = next((x for x in parts if 'فابور' in x or 'مجان' in x), '')
+    name = parts[0] if parts and parts[0] not in (price, free) else ''
+    img = Image.new('RGBA', (1080, 330), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
+    y = 30
+    if name:
+        y = draw_lines(d, lines_of(name, font(54), 1000)[:2], font(54), y, 'white', 5) + 10
+    pill = '  ·  '.join(x for x in (free, price) if x)  # RTL: the price reads first
+    if pill:
+        vis = get_display(arabic_reshaper.reshape(pill)); f = font(58)
+        wdt = f.getlength(vis) + 80
+        d.rounded_rectangle((540 - wdt / 2, y, 540 + wdt / 2, y + 92), 46, fill='#FFD400')
+        d.text((540, y + 46), vis, font=f, fill='black', anchor='mm')
+    img.save(f'{work}/banner.png'); layers.append((f'{work}/banner.png', 0, 'inf'))
+
+# Subtitles: short chunks, each shown for a share of the voice that matches its length.
+if subtitles:
+    chunks, cur = [], []
+    for w in script.split():
+        cur.append(w)
+        if len(cur) >= 5 or w[-1] in '.!?؟،,:':
+            chunks.append(' '.join(cur)); cur = []
+    if cur: chunks.append(' '.join(cur))
+    total = sum(len(c) for c in chunks); t = 0.0
+    for i, c in enumerate(chunks):
+        img = Image.new('RGBA', (1080, 200), (0, 0, 0, 0))
+        draw_lines(ImageDraw.Draw(img), lines_of(c, font(66), 1000)[:2], font(66), 10, 'white', 7)
+        img.save(f'{work}/sub{i}.png')
+        end = t + dur * len(c) / total
+        layers.append((f'{work}/sub{i}.png', t, 'inf' if i == len(chunks) - 1 else end)); t = end
+
+bg = '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:5,eq=brightness=-0.08[bg];'
+n = 2
 if photos:
+    graph = bg + "[0:v]scale=1080:900:force_original_aspect_ratio=increase,crop=1080:900:(iw-1080)/2:(ih-900)*0.3[fg];[bg][fg]overlay=0:300[t0];"
+    sub_y = 1010
     # Each product photo takes an equal slice of the voice, one after another.
-    with wave.open(f'{work}/voice.wav') as w:
-        dur = w.getnframes() / w.getframerate()
     photos = photos[:max(1, int(dur))]  # at least a second per photo
     seg = dur / len(photos)
-    inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
-    graph = bg + '[bg][fg]overlay=(W-w)/2:160[t0];'
+    k = 0
     for i, ph in enumerate(photos):
         inputs += ['-loop', '1', '-i', ph]
         end = 'inf' if i == len(photos) - 1 else f'{(i + 1) * seg:.3f}'
-        graph += (f'[{i + 2}:v]scale=960:640:force_original_aspect_ratio=decrease[p{i}];'
-                  f"[t{i}][p{i}]overlay=(W-w)/2:1260:shortest=1:enable='between(t,{i * seg:.3f},{end})'[t{i + 1}];")
-    graph += f'[t{len(photos)}]fps=25,format=yuv420p[v]'
+        graph += (f'[{n}:v]scale=1000:680:force_original_aspect_ratio=decrease[p{i}];'
+                  f"[t{k}][p{i}]overlay=(W-w)/2:1220:shortest=1:enable='between(t,{i * seg:.3f},{end})'[t{k + 1}];")
+        n += 1; k += 1
 else:
-    inputs = ['-i', vids[-1], '-i', f'{work}/voice.wav']
-    graph = bg + '[bg][fg]overlay=(W-w)/2:(H-h)/2,fps=25,format=yuv420p[v]'
+    graph = bg + '[0:v]scale=1080:1350:force_original_aspect_ratio=increase,crop=1080:1350:(iw-1080)/2:(ih-1350)*0.3[fg];[bg][fg]overlay=0:330[t0];'
+    sub_y = 1480
+    k = 0
+for path, a, b in layers:
+    inputs += ['-loop', '1', '-i', path]
+    y = 0 if path.endswith('banner.png') else sub_y
+    end = b if b == 'inf' else f'{b:.3f}'
+    graph += f"[t{k}][{n}:v]overlay=0:{y}:shortest=1:enable='between(t,{a:.3f},{end})'[t{k + 1}];"
+    n += 1; k += 1
+graph += f'[t{k}]fps=25,format=yuv420p[v]'
 p = subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', *inputs, '-filter_complex', graph,
                     '-map', '[v]', '-map', '1:a', '-c:v', 'libx264', '-crf', '20', '-preset', 'veryfast',
                     '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out],
