@@ -1,4 +1,6 @@
-const GOOGLE_VOICE_IDS=['Kore','Puck','Charon','Sulafat'];
+const GOOGLE_VOICE_IDS=['Kore','Puck','Charon','Sulafat','Aoede','Leda','Despina','Achernar','Zephyr','Fenrir','Orus','Algieba','Alnilam','Sadaltager'];
+// Delivery styles are picked by id so visitors can't send free-form prompts to the model.
+const GOOGLE_VOICE_STYLES={hype:'Energetic, excited, fast-paced advertising delivery, like a TikTok ad.',calm:'Calm, soft, trustworthy tone, like a friend giving advice.',testimonial:'Like a real customer giving an honest testimonial, casual and spontaneous.'};
 // Paid speech is restricted to an explicitly configured owner, never public visitors.
 async function handleVoice(request,env,user,u){
 if(!user)return json({error:'UNAUTHENTICATED'},401);
@@ -32,7 +34,7 @@ if(typeof b.text!=='string'||!b.text.trim()||b.text.length>1000)return json({err
 const provider=b.provider||'elevenlabs';
 if(!['google','elevenlabs'].includes(provider))return json({error:'INVALID_TEXT'},400);
 if(!providers[provider])return json({error:'VOICE_NOT_CONFIGURED'},503);
-if(provider==='google')return googleVoice(b.text.trim(),env,selectedVoice);
+if(provider==='google')return googleVoice(b.text.trim(),env,selectedVoice,Object.hasOwn(GOOGLE_VOICE_STYLES,b.style)?GOOGLE_VOICE_STYLES[b.style]:undefined);
 if(!/^[a-zA-Z0-9_-]{5,100}$/.test(env.ELEVENLABS_VOICE_ID))return json({error:'VOICE_NOT_CONFIGURED'},503);
 try{
 const r=await fetch('https://api.elevenlabs.io/v1/text-to-speech/'+env.ELEVENLABS_VOICE_ID+'?output_format=mp3_44100_128',{method:'POST',headers:{'content-type':'application/json','xi-api-key':env.ELEVENLABS_API_KEY},body:JSON.stringify({text:b.text.trim(),model_id:'eleven_v3',language_code:'ar'}),redirect:'manual',signal:AbortSignal.timeout(90000)});
