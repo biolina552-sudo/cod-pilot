@@ -119,6 +119,9 @@ product = "مثلا: سيروم الشعر، 199 درهم، التوصيل فا�
 voice = "تلقائي"  #@param ["تلقائي", "Kore (امرأة، قوية)", "Sulafat (امرأة، دافية)", "Leda (امرأة، شابة)", "Aoede (امرأة، خفيفة)", "Puck (راجل، فرحان)", "Orus (راجل، ثابت)", "Charon (راجل، كيشرح)", "Fenrir (راجل، متحمس)"]
 style = "عادي"  #@param ["عادي", "حماسي (تيكتوك)", "هادئ ومقنع", "شهادة ديال كليان"]
 add_product_photo = True  #@param {type:"boolean"}
+#@markdown **الحركة والجودة:**
+movement = "طبيعية (الراس كيتحرك)"  #@param ["طبيعية (الراس كيتحرك)", "قوية (تعابير أكثر)", "ثابتة (غير الفم)"]
+quality = "عادية (أسرع)"  #@param ["عادية (أسرع)", "عالية 512 (كتاخد ضعف الوقت)"]
 
 import os, json, base64, wave, glob, shutil, subprocess, time, requests
 from IPython.display import display, HTML, clear_output
@@ -253,9 +256,11 @@ if old in src:
         'mask, (location[0] + m, location[1] + m), cv2.NORMAL_CLONE)[m:m + frame_h, m:m + frame_w]'))
 
 print('⏳ كنخليو الشخصية تهضر (هادي كتاخد شي 5 حتى 8 دقايق)...')
+motion = (['--still'] if movement.startswith('ثابتة') else
+          ['--pose_style', str(int(time.time()) % 46), '--expression_scale', '1.4' if movement.startswith('قوية') else '1.15'])
 p = subprocess.run(['/content/st38/bin/python', 'inference.py', '--driven_audio', f'{work}/voice.wav',
-                    '--source_image', face, '--result_dir', f'{work}/st', '--size', '256', '--still',
-                    '--preprocess', 'full', '--enhancer', 'gfpgan'], cwd='/content/SadTalker',
+                    '--source_image', face, '--result_dir', f'{work}/st', '--size', '512' if quality.startswith('عالية') else '256',
+                    *motion, '--preprocess', 'full', '--enhancer', 'gfpgan'], cwd='/content/SadTalker',
                    capture_output=True, text=True)
 vids = sorted(glob.glob(f'{work}/st/*.mp4'))
 if p.returncode or not vids:
