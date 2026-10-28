@@ -212,12 +212,12 @@ def speak(txt, voice_name, out):
     if str(last) == 'LIMIT': raise SystemExit(LIMIT_MSG)
     raise SystemExit('❌ Gemini ما رجعش الصوت. عاود من بعد شوية.')
 
-def ask_photo(msg):
+def ask_photo(msg, tag):
     print(msg)
     up = files.upload()
     if not up: raise SystemExit('❌ ما تحطات حتى صورة.')
     name = next(iter(up))
-    path = '/content/upload_' + name.replace(' ', '_')
+    path = f'/content/upload_{tag}_' + name.replace(' ', '_')
     shutil.move(name, path)
     return path
 
@@ -225,11 +225,11 @@ work = f'/content/work/{int(time.time())}'
 os.makedirs(work, exist_ok=True)
 num = int(character.split('.')[0])
 if num == 5:
-    face = ask_photo('📷 حط صورة الشخصية (وجه واضح، كيشوف للكاميرا):')
+    face = ask_photo('📷 حط صورة الشخصية (وجه واضح، كيشوف للكاميرا):', 'face')
 else:
     face = f'/content/characters/{num}.png'
 voice_name = voice.split(' ')[0] if voice != 'تلقائي' else {1: 'Sulafat', 2: 'Leda', 3: 'Puck', 4: 'Orus', 5: 'Kore'}[num]
-photo = ask_photo('🛍️ حط صورة المنتج:') if add_product_photo else None
+photo = ask_photo('🛍️ حط صورة المنتج:', 'product') if add_product_photo else None
 
 script = text.strip() or write_script()
 if len(script) > 1500:
