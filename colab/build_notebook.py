@@ -243,7 +243,16 @@ print('📝 النص:\n' + script + '\n')
 print('⏳ كنصاوبو الصوت...')
 speak(script, voice_name, f'{work}/voice.wav')
 
-print('⏳ كنخليو الشخصية تهضر (هادي كتاخد شي 2 حتى 6 دقايق)...')
+# SadTalker's paste-back fails when the face box crosses the photo edge; pad the photo while blending.
+pp = '/content/SadTalker/src/utils/paste_pic.py'
+src = open(pp).read()
+old = '        gen_img = cv2.seamlessClone(p, full_img, mask, location, cv2.NORMAL_CLONE)'
+if old in src:
+    open(pp, 'w').write(src.replace(old,
+        '        m = max(p.shape[:2]); gen_img = cv2.seamlessClone(p, cv2.copyMakeBorder(full_img, m, m, m, m, cv2.BORDER_REPLICATE), '
+        'mask, (location[0] + m, location[1] + m), cv2.NORMAL_CLONE)[m:m + frame_h, m:m + frame_w]'))
+
+print('⏳ كنخليو الشخصية تهضر (هادي كتاخد شي 5 حتى 8 دقايق)...')
 p = subprocess.run(['/content/st38/bin/python', 'inference.py', '--driven_audio', f'{work}/voice.wav',
                     '--source_image', face, '--result_dir', f'{work}/st', '--size', '256', '--still',
                     '--preprocess', 'full', '--enhancer', 'gfpgan'], cwd='/content/SadTalker',
