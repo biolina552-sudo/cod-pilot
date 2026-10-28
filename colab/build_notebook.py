@@ -122,7 +122,7 @@ add_product_photo = True  #@param {type:"boolean"}
 subtitles = True  #@param {type:"boolean"}
 #@markdown **الحركة والجودة:**
 movement = "طبيعية (الراس كيتحرك)"  #@param ["طبيعية (الراس كيتحرك)", "قوية (تعابير أكثر)", "ثابتة (غير الفم)"]
-quality = "عادية (أسرع)"  #@param ["عادية (أسرع)", "عالية 512 (كتاخد ضعف الوقت)"]
+quality = "عادية"  #@param ["سريعة (ضعف السرعة، الوجه أقل وضوح)", "عادية", "عالية 512 (كتاخد ضعف الوقت)"]
 
 import os, json, base64, wave, glob, shutil, subprocess, time, requests
 from IPython.display import display, HTML, clear_output
@@ -261,7 +261,8 @@ motion = (['--still'] if movement.startswith('ثابتة') else
           ['--pose_style', str(int(time.time()) % 46), '--expression_scale', '1.4' if movement.startswith('قوية') else '1.15'])
 p = subprocess.run(['/content/st38/bin/python', 'inference.py', '--driven_audio', f'{work}/voice.wav',
                     '--source_image', face, '--result_dir', f'{work}/st', '--size', '512' if quality.startswith('عالية') else '256',
-                    *motion, '--preprocess', 'full', '--enhancer', 'gfpgan'], cwd='/content/SadTalker',
+                    *motion, '--preprocess', 'full', '--batch_size', '8',
+                    *([] if quality.startswith('سريعة') else ['--enhancer', 'gfpgan'])], cwd='/content/SadTalker',
                    capture_output=True, text=True)
 vids = sorted(glob.glob(f'{work}/st/*.mp4'))
 if p.returncode or not vids:
