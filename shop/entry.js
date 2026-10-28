@@ -34,7 +34,17 @@ async function loadPage(env,slug){
   return page.published?page:null;
 }
 
-export default {async fetch(request,env){
+// Sends a new order to the seller's n8n webhook (secrets N8N_WEBHOOK_URL and
+// N8N_WEBHOOK_SECRET). Never blocks or fails the customer's order.
+function lpNotify(env,record){
+  const url=String(env.N8N_WEBHOOK_URL||'').trim();if(!/^https:\/\//.test(url))return null;
+  const o=record.offer||{};
+  const body={id:record.id,date:record.created_at,product:record.product,page:record.slug,offer:o.label||o.qty+' x',qty:o.qty,price:o.price,currency:record.currency,
+    name:record.name,phone:record.phone,city:record.city,address:record.address||'',status:record.status,country:record.country||''};
+  return fetch(url,{method:'POST',headers:{'content-type':'application/json','x-cod-pilot-secret':String(env.N8N_WEBHOOK_SECRET||'')},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)}).catch(()=>{});
+}
+
+export default {async fetch(request,env,ctx){
   const u=new URL(request.url);let path;try{path=decodeURIComponent(u.pathname).replace(/\/+$/,'')||'/'}catch{return notFound()}
   if(path==='/robots.txt')return new Response('User-agent: *\nAllow: /\n',{headers:{'content-type':'text/plain'}});
   if(path==='/')return html('<!doctype html><meta charset="utf-8"><title>Shop</title><p style="font-family:system-ui;text-align:center;margin-top:20vh">🛍️</p>');
@@ -76,6 +86,7 @@ export default {async fetch(request,env){
     const data=JSON.stringify(record);
     // The order also goes in metadata (when it fits) so the app lists orders in one call.
     await env.BUCKET.put('orders/'+encodeURIComponent(page.owner)+'/'+id+'.json',data,{httpMetadata:{contentType:'application/json'},customMetadata:new TextEncoder().encode(data).length<1900?{d:data}:{}});
+    const sent=lpNotify(env,record);if(sent)ctx?.waitUntil?ctx.waitUntil(sent):await sent;
     return thanks(id);
   }
   return new Response('Method not allowed',{status:405});
